@@ -43,7 +43,7 @@ if __name__ == "__main__":
     parser.add_argument("--debugging", type=str2bool, default=True, help="Whether or not we are debugging the script. Default: False")
     # Parse the arguments into a Namespace variable
     FLAGS = parser.parse_args()
-    FLAGS = main_setup(FLAGS)
+    FLAGS, cfg = main_setup(FLAGS)
 
 # Import the other custom libraries
 from shutil import make_archive                                             # Used to zip the directory of the output folder
