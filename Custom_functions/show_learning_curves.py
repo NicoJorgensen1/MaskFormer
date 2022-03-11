@@ -1,6 +1,5 @@
 # Import libraries
 import os
-from turtle import color 
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
