@@ -1,23 +1,26 @@
 # Import libraries 
+from detectron2.utils import comm
+from detectron2.checkpoint import DetectionCheckpointer
+from detectron2.engine import default_setup, launch
+from detectron2.evaluation import verify_results
+from detectron2.utils.logger import setup_logger
 from custom_goto_trainer_class import My_GoTo_Trainer
 
 
-def setup(args):
-    cfg = args.config                           # Create the custom config as an independent file
-    default_setup(cfg, args)
+def setup(FLAGS):
+    cfg = FLAGS.config                           # Create the custom config as an independent file
+    default_setup(cfg, FLAGS)
     # Setup logger for "mask_former" module
     setup_logger(output=cfg.OUTPUT_DIR, distributed_rank=comm.get_rank(), name="mask_former")
     return cfg
 
 
-def main(args):
-    cfg = setup(args)
+def run_train_func(FLAGS):
+    cfg = setup(FLAGS)
 
-    if args.eval_only:
+    if FLAGS.eval_only:
         model = My_GoTo_Trainer.build_model(cfg)
-        DetectionCheckpointer(model, save_dir=cfg.OUTPUT_DIR).resume_or_load(
-            cfg.MODEL.WEIGHTS, resume=args.resume
-        )
+        DetectionCheckpointer(model, save_dir=cfg.OUTPUT_DIR).resume_or_load(cfg.MODEL.WEIGHTS, resume=FLAGS.resume)
         res = My_GoTo_Trainer.test(cfg, model)
         if cfg.TEST.AUG.ENABLED:
             res.update(My_GoTo_Trainer.test_with_TTA(cfg, model))
@@ -26,26 +29,20 @@ def main(args):
         return res
 
     trainer = My_GoTo_Trainer(cfg)
-    # val_loss_hook = ValLossHook(cfg=cfg)
-    # trainer.register_hooks([val_loss_hook])
-    # Implement BestCheckpointer hook somehow...
-    # best_checkpoint_hook = BestCheckpointer(eval_period=cfg.TEST.EVAL_PERIOD, checkpointer=Checkpointer, val_metric="total_loss", mode="min", file_prefix="model_best")
-    # periodic_writer_hook = [hook for hook in trainer._hooks if isinstance(hook, PeriodicWriter)]
-    # all_other_hooks = [hook for hook in trainer._hooks if not isinstance(hook, PeriodicWriter) and not isinstance(hook, PeriodicCheckpointer)]
-    # trainer.register_hooks(hooks=all_other_hooks + periodic_writer_hook)
-    trainer.resume_or_load(resume=args.resume)
-    return trainer.train()
+    trainer.resume_or_load(resume=FLAGS.resume)
+    trainer.train()
+    return
 
 
 # Function to launch the training
-def launch_custom_training(args, config):
-    print("Command Line Args:", args)
-    args.config = config
+def launch_custom_training(FLAGS, config):
+    print("Command Line FLAGS:", FLAGS)
+    FLAGS.config = config
     launch(
-        main,
-        args.num_gpus,
-        num_machines=args.num_machines,
-        machine_rank=args.machine_rank,
-        dist_url=args.dist_url,
-        args=(args,),
+        run_train_func,
+        FLAGS.num_gpus,
+        num_machines=FLAGS.num_machines,
+        machine_rank=FLAGS.machine_rank,
+        dist_url=FLAGS.dist_url,
+        FLAGS=(FLAGS,),
     )
