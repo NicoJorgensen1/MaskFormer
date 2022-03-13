@@ -56,15 +56,16 @@ def extractNumbersFromString(str, dtype=float, numbersWanted=1):
 
 
 # Define a function to put the latest saved model as the model_weights in the config before creating the dataloader
-def putModelWeights(config):
+def putModelWeights(config, delete_remaining=False):
     model_files = [x for x in os.listdir(config.OUTPUT_DIR) if "model" in x.lower() and x.endswith(".pth") and not np.isnan(extractNumbersFromString(x))]   # Find all saved model checkpoints
     if len(model_files) >= 1:                                                       # If any model checkpoint is found, 
         iteration_numbers = [extractNumbersFromString(x, int) for x in model_files] # Find the iteration numbers for when they were saved
         latest_iteration_idx = np.argmax(iteration_numbers)                         # Find the index of the model checkpoint with the latest iteration number
         config.MODEL.WEIGHTS = os.path.join(config.OUTPUT_DIR, model_files[latest_iteration_idx])   # Assign the latest model checkpoint to the config
-        for model_file in model_files:                                              # Loop through all found model checkpoint files
-            if os.path.join(config.OUTPUT_DIR,model_file) != config.MODEL.WEIGHTS:  # If the current model_file is not the checkpoint file ...
-                os.remove(os.path.join(config.OUTPUT_DIR,model_file))               # ... remove the current model_file
+        if delete_remaining==True:                                                  # If the user chose to delete all other but the final model, ... 
+            for model_file in model_files:                                          # ... loop through all found model checkpoint files
+                if os.path.join(config.OUTPUT_DIR,model_file) != config.MODEL.WEIGHTS:  # If the current model_file is not the newest checkpoint file ...
+                    os.remove(os.path.join(config.OUTPUT_DIR,model_file))           # ... remove the current model_file
     return config                                                                   # Return the updated config
 
 
@@ -111,7 +112,7 @@ def visualize_the_images(config, FLAGS, position=[0.55, 0.08, 0.40, 0.75], data_
         img_ytrue_ypred, data_batch, FLAGS = create_batch_img_ytrue_ypred(config=config,# Create the batch of images that needs to be visualized
                 data_split=data_split, FLAGS=FLAGS, data_batch=data_batch)          # And return the images in the data_batch dictionary
         num_rows, num_cols = 3, FLAGS.num_images                                    # The figure will have three rows (input, y_pred, y_true) and one column per image
-        fig = plt.figure(figsize=(int(np.ceil(FLAGS.num_images*5)), 8))             # Create the figure object
+        fig = plt.figure(figsize=(int(np.ceil(FLAGS.num_images*5.5)), 8))           # Create the figure object
         fig = plt.figure()
         row = 0                                                                     # Initiate the row index counter (all manual indexing could have been avoided by having created img_ytrue_ypred as an OrderedDict)
         for key in img_ytrue_ypred.keys():                                          # Loop through all the keys in the batch dictionary
