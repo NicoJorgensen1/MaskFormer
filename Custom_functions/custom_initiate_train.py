@@ -27,9 +27,11 @@ from custom_setup_func import rename_output_inference_folder, setup_func, zip_ou
 from custom_train_func import launch_custom_training                        # Function to launch the training with custom dataset
 from visualize_vitrolife_batch import visualize_the_images                  # Import the function used for visualizing the image batch
 from show_learning_curves import show_history                               # Function used to plot the learning curves for the given training
+from custom_evaluation_func import evaluateResults                          # Function to evaluate the metrics for the segmentation
 
 # Get the FLAGS and config variables
 FLAGS, cfg = setup_func()
+
 
 # Visualize some random images
 fig_list_before, data_batches, cfg, FLAGS = visualize_the_images(config=cfg, FLAGS=FLAGS)   # Visualize some segmentations on random images before training
@@ -37,12 +39,16 @@ fig_list_before, data_batches, cfg, FLAGS = visualize_the_images(config=cfg, FLA
 # Train the model
 launch_custom_training(args=FLAGS, config=cfg)                              # Launch the training loop
 
+# Evaluate the model
+eval_train_results = evaluateResults(FLAGS, cfg, data_split="train")        # Evaluate the result metrics on the training set
+eval_train_results = evaluateResults(FLAGS, cfg, data_split="val")          # Evaluate the result metrics on the validation set
+
 # Visualize the same images, now with a trained model
 fig_list_after, data_batches, cfg, FLAGS = visualize_the_images(            # Visualize the same images ...
     config=cfg,FLAGS=FLAGS, data_batches=data_batches, model_has_trained=True)  # ... now after training
 
 # Evaluation on the vitrolife test dataset. There is no ADE20K test dataset.
-if FLAGS.debugging == False and "vitrolife" in FLAGS.dataset_name.lower():  # Inference will only be performed if we are not debugging the model
+if FLAGS.debugging == False and "vitrolife" in FLAGS.dataset_name.lower():  # Inference will only be performed if we are not debugging the model and working on the vitrolife dataset
     rename_output_inference_folder(config=cfg)                              # Rename the "inference" folder in OUTPUT_DIR to "validation" before doing inference
     FLAGS.eval_only = True                                                  # Letting the model know we will only perform evaluation here
     cfg.DATASETS.TEST = ("vitrolife_dataset_test",)                         # The inference will be done on the test dataset

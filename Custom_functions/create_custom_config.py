@@ -1,6 +1,6 @@
 import os                                                                                   # Used to navigate around the current os and folder structure
 import torch                                                                                # torch is implemented to check if a GPU is available
-import numpy as np
+import numpy as np                                                                          # Used to compute the step ranges
 from sys import path as sys_PATH                                                            # Import the PATH variable
 from detectron2.data import MetadataCatalog                                                 # Catalog containing metadata for all datasets available in Detectron2
 from detectron2.config import get_cfg                                                       # Function to get the default configuration from Detectron2
@@ -53,14 +53,15 @@ def createVitrolifeConfiguration(FLAGS):
     cfg.SOLVER.MAX_ITER = FLAGS.max_iter if "MAX_ITER" in key_list else int(2e4)            # Maximum number of iterations to train for
     cfg.SOLVER.LR_SCHEDULER_NAME = "WarmupMultiStepLR"                                      # Default learning rate scheduler
     cfg.SOLVER.NESTEROV = True                                                              # Whether or not the learning algorithm will use Nesterow momentum
-    cfg.SOLVER.WEIGHT_DECAY = float(2e-5)                                                   # A small lambda value for the weight decay
+    cfg.SOLVER.WEIGHT_DECAY = float(2e-3)                                                   # A small lambda value for the weight decay
     cfg.TEST.AUG.FLIP = False                                                               # No random flipping or augmentation used for inference
     cfg.MODEL.PANOPTIC_FPN.COMBINE.ENABLED = False                                          # Disable the panoptic head during inference
     cfg.DATALOADER.NUM_WORKERS = FLAGS.num_workers                                          # Set the number of workers to only 2
     cfg.INPUT.CROP.ENABLED =  FLAGS.crop_enabled                                            # We will not allow any cropping of the input images
     cfg.MODEL.DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'                       # Assign the device on which the model should run
-    cfg.MODEL.MASK_FORMER.DICE_WEIGHT = 5                                                   # Set the weight for the dice loss
+    cfg.MODEL.MASK_FORMER.DICE_WEIGHT = 10                                                  # Set the weight for the dice loss
     cfg.MODEL.MASK_FORMER.MASK_WEIGHT = 20                                                  # Set the weight for the mask predictive loss
+    cfg.MODEL.MASK_FORMER.DROPOUT = float(0.2)                                              # We'll set a dropout probability on 0.2 when training
     # cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST = 0.5                                           # Assign the threshold used for the model
     cfg.OUTPUT_DIR = os.path.join(MaskFormer_dir, "output_"+FLAGS.output_dir_postfix)       # Get MaskFormer directory and name the output directory
     config_name = "config_initial.yaml"                                                     # Initial name for the configuration that will be saved in the cfg.OUTPUT_DIR
@@ -85,6 +86,8 @@ def createVitrolifeConfiguration(FLAGS):
         cfg.SOLVER.CHECKPOINT_PERIOD = int(np.subtract(cfg.SOLVER.MAX_ITER, 1))             # ... a checkpoint will only be saved after the final iteration
         cfg.TEST.EVAL_PERIOD = int(np.subtract(cfg.SOLVER.MAX_ITER, 1))                     # ... inference will only happen after the final iteration
         cfg.DATASETS.TEST = cfg.DATASETS.TRAIN                                              # ... and inference will happen on the training set
+        cfg.SOLVER.WEIGHT_DECAY = float(0)                                                  # ... we don't want any weight decay
+        cfg.MODEL.MASK_FORMER.DROPOUT = float(0)                                            # ... we don't wany any dropout
 
     # Write the new config as a .yaml file - it already does, in the output dir...
     os.makedirs(cfg.OUTPUT_DIR, exist_ok=True)                                              # Create the output folder, if it doesn't already exist
