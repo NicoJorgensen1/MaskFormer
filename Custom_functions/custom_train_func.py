@@ -2,7 +2,6 @@
 from detectron2.utils import comm
 from detectron2.checkpoint import DetectionCheckpointer
 from detectron2.engine import default_setup
-from detectron2.evaluation import verify_results
 from detectron2.utils.logger import setup_logger
 from custom_goto_trainer_class import My_GoTo_Trainer
 
@@ -22,14 +21,10 @@ def run_train_func(FLAGS):
         model = My_GoTo_Trainer.build_model(cfg)
         DetectionCheckpointer(model, save_dir=cfg.OUTPUT_DIR).resume_or_load(cfg.MODEL.WEIGHTS, resume=FLAGS.resume)
         res = My_GoTo_Trainer.test(cfg, model)
-        if cfg.TEST.AUG.ENABLED:
-            res.update(My_GoTo_Trainer.test_with_TTA(cfg, model))
-        if comm.is_main_process():
-            verify_results(cfg, res)
         return res
 
     trainer = My_GoTo_Trainer(cfg)
-    trainer.resume_or_load(resume=FLAGS.resume)
+    trainer.resume_or_load(resume=False)
     trainer.train()
     return trainer
 

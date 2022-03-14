@@ -2,11 +2,13 @@ import itertools
 import logging
 import os
 import torch
+import numpy as np
 from copy import copy
 from detectron2.utils import comm
 from collections import OrderedDict
 from typing import Any, Dict, List, Set
 from detectron2.data import build_detection_train_loader, MetadataCatalog
+from detectron2.data.samplers.distributed_sampler import TrainingSampler
 from detectron2.engine import DefaultTrainer, hooks
 from detectron2.engine.hooks import BestCheckpointer
 from detectron2.evaluation import SemSegEvaluator
@@ -28,7 +30,7 @@ class My_GoTo_Trainer(DefaultTrainer):
     def build_train_loader(cls, cfg):
         # Semantic segmentation dataset mapper
         mapper = MaskFormerSemanticDatasetMapper(cfg, True)
-        return build_detection_train_loader(cfg, mapper=mapper)
+        return build_detection_train_loader(cfg, mapper=mapper, sampler=TrainingSampler(size=MetadataCatalog[cfg.DATASETS.TRAIN[0]].num_files_in_dataset, shuffle=True))
 
     @classmethod
     def build_lr_scheduler(cls, cfg, optimizer):
@@ -157,6 +159,7 @@ class My_GoTo_Trainer(DefaultTrainer):
             # Here the default print/log frequency of each writer is used.
             # run writers in the end, so that evaluation metrics are written
             # ret.append(hooks.PeriodicWriter(self.build_writers(), period=10))
-            ret.append(hooks.PeriodicWriter(self.build_writers(), period=int(MetadataCatalog[self.cfg.DATASETS.TRAIN[0]].num_files_in_dataset/36)))
+            # ret.append(hooks.PeriodicWriter(self.build_writers(), period=int(MetadataCatalog[self.cfg.DATASETS.TRAIN[0]].num_files_in_dataset/25)))
+            ret.append(hooks.PeriodicWriter(self.build_writers(), period=int(MetadataCatalog[self.cfg.DATASETS.TRAIN[0]].num_files_in_dataset/np.min([25, MetadataCatalog[self.cfg.DATASETS.TRAIN[0]].num_files_in_dataset]))))
         return ret
         

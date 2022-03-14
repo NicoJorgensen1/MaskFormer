@@ -48,15 +48,15 @@ def extractNumbersFromString(str, dtype=float, numbersWanted=1):
         if len(vals) > 0:                                                           # If any numbers is found ...
             for kk in range(len(vals)):                                             # Loop through all the found numbers
                 vals[kk] = dtype(vals[kk])                                          # Convert each of the found numbers into the wanted dtype
-                if kk == numbersWanted-1: break                                     # If we have convert all the numbers wanted, we'll stop the loop
-            vals = vals[:numbersWanted]                                             # Then we'll only use up to 'numbersWanted' found numbers
+                if kk+1 == numbersWanted: break                                     # If we have convert all the numbers wanted, we'll stop the loop
+            if numbersWanted < len(vals): vals = vals[:numbersWanted]               # Then we'll only use up to 'numbersWanted' found numbers
             if numbersWanted==1: vals = vals[0]                                     # If we only want 1 number, then we'll extract that from the list
         else: vals = np.nan                                                         # ... else if no numbers were found, return NaN
     return vals                                                                     # Return the wanted numbers, either as a type 'dtype' or, if multiple numbers, a list of 'dtypes'
 
 
 # Define a function to put the latest saved model as the model_weights in the config before creating the dataloader
-def putModelWeights(config, delete_remaining=False):
+def putModelWeights(config, put_latest=True, delete_remaining=False):
     model_files = [x for x in os.listdir(config.OUTPUT_DIR) if "model" in x.lower() and x.endswith(".pth") and not np.isnan(extractNumbersFromString(x))]   # Find all saved model checkpoints
     if len(model_files) >= 1:                                                       # If any model checkpoint is found, 
         iteration_numbers = [extractNumbersFromString(x, int) for x in model_files] # Find the iteration numbers for when they were saved
@@ -101,8 +101,15 @@ def create_batch_img_ytrue_ypred(config, data_split, FLAGS, data_batch=None):
     return img_ytrue_ypred, data_batch, FLAGS
 
 
+def get_save_dirs(config, dataset_split):
+    for data_split in ["train", "val", "test"]:
+        if "vitrolife" not in config.DATASETS.TRAIN[0].lower() and data_split=="test": continue     # There are no test dataset for the ade20k
+        os.makedirs(os.path.join(config.OUTPUT_DIR, "Visualizations", data_split), exist_ok=True)   # Create a folder to store the segmentations of the images
+    return os.path.join(config.OUTPUT_DIR, "Visualizations", dataset_split)                         # Return the folder name of the current dataset split
+
+
 # Define function to plot the images
-def visualize_the_images(config, FLAGS, position=[0.55, 0.08, 0.40, 0.75], data_batches=None, model_has_trained=False):
+def visualize_the_images(config, FLAGS, position=[0.55, 0.08, 0.40, 0.75], epoch_num=None, data_batches=None, model_has_trained=False):
     # Get the datasplit and number of images to show
     fig_list, data_batches_final = list(), list()                                   # Initiate the list to store the figures in
     if data_batches==None: data_batches = [None, None, None]                        # If no previous data has been sent, it must be a list of None's...
@@ -127,8 +134,10 @@ def visualize_the_images(config, FLAGS, position=[0.55, 0.08, 0.40, 0.75], data_
         try: fig = move_figure_position(fig=fig, position=position)                 # Try and move the figure to the wanted position (only possible on home computer with a display)
         except: pass                                                                # Except, simply just let the figure retain the current position
         fig.tight_layout()                                                          # Assures the subplots are plotted tight around each other
-        figure_name = "Segmented_{:s}_data_samples_from_{:s}_training.jpg".format(data_split, "after" if model_has_trained else "before")   # Create a name for the figure
-        fig.savefig(os.path.join(config.OUTPUT_DIR, figure_name), bbox_inches="tight")  # Save the figure in the output directory
+        fig_name_init = "Segmented_{:s}_data_samples_from_".format(data_split)      # Initialize the figure name
+        if epoch_num != None: fig_name = "{:s}epoch_{:d}.jpg".format(fig_name_init, epoch_num)                              # If an epoch number has been specified, the figure name will contain that
+        else: fig_name = "{:s}{:s}_training.jpg".format(fig_name_init, "after" if model_has_trained else "before")          # Otherwise the visualization happens before/after training
+        fig.savefig(os.path.join(get_save_dirs(config=config, dataset_split=data_split), fig_name), bbox_inches="tight")    # Save the figure in the correct output directory
         fig_list.append(fig)                                                        # Append the current figure to the list of figures
         data_batches_final.append(data_batch)                                       # Append the current data_batch to the list of data_batches
         fig.show() if FLAGS.display_images==True else plt.close(fig)                # Display the figure if that is the chosen option

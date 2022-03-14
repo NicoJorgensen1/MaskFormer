@@ -82,7 +82,7 @@ def changeConfig_withFLAGS(cfg, FLAGS):
         cfg.MODEL.PIXEL_MEAN = [100.15, 102.03, 103.89]                                     # Write the correct image mean value for the entire vitrolife dataset
         cfg.MODEL.PIXEL_STD = [57.32, 59.69, 61.93]                                         # Write the correct image standard deviation value for the entire vitrolife dataset
         cfg.SOLVER.CHECKPOINT_PERIOD = FLAGS.epoch_iter                                     # Save a new model checkpoint after each epoch, i.e. after everytime the entire trainining set has been seen by the model
-        cfg.SOLVER.STEPS = np.subtract([int(x+1)*np.min([500, FLAGS.epoch_iter]) for x in range(500)],1).tolist()   # The iterations where the learning rate will be lowered with a factor of "gamma"
+        cfg.SOLVER.STEPS = np.subtract([int(x+1)*np.min([500, 2+FLAGS.epoch_iter]) for x in range(500)],1).tolist() # The iterations where the learning rate will be lowered with a factor of "gamma"
         cfg.SOLVER.GAMMA = 0.25                                                             # After every "step" iterations the learning rate will be updated, as new_lr = old_lr*gamma
         cfg.OUTPUT_DIR = cfg.OUTPUT_DIR.replace("output_", "output_vitrolife_")             # Insert the 'vitrolife' to the output directory, if using the vitrolife dataset
         config_name = "vitrolife_" + config_name                                            # Prepend the config name with "vitrolife"
