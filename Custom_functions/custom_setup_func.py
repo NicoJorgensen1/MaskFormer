@@ -8,7 +8,7 @@ from detectron2.data import DatasetCatalog, MetadataCatalog                 # Ca
 from detectron2.engine import default_argument_parser                       # Default argument_parser object
 from GPU_memory_ranked_assigning import assign_free_gpus                    # Function to assign the script to a given number of GPUs
 from register_vitrolife_dataset import register_vitrolife_data_and_metadata_func    # Register the vitrolife dataset and metadata in the Detectron2 dataset catalog
-from create_custom_config import createVitrolifeConfiguration               # Function to create a configuration used for training 
+from create_custom_config import createVitrolifeConfiguration, changeConfig_withFLAGS   # Function to create a configuration used for training 
 
 
 # Function to rename the automatically created "inference" directory in the OUTPUT_DIR from "inference" to "validation" before performing actual inference with the test set
@@ -37,10 +37,6 @@ def changeFLAGS(FLAGS):
     if FLAGS.eval_only != FLAGS.inference_only: FLAGS.eval_only = FLAGS.inference_only  # As there are two inputs where "eval_only" can be set, inference_only is the superior
     return FLAGS
 
-# Define the main function used to send input arguments. Just return the FLAGS arguments as a namespace variable
-def main(FLAGS):
-    return FLAGS
-
 # Running the parser function. By doing it like this the FLAGS will get out of the main function
 parser = default_argument_parser()
 start_time = datetime.now().strftime("%H_%M_%d%b%Y").upper()
@@ -54,7 +50,7 @@ parser.add_argument("--resnet_depth", type=int, default=50, help="The depth of t
 parser.add_argument("--batch_size", type=int, default=1, help="The batch size used for training the model. Default: 1")
 parser.add_argument("--num_images", type=int, default=5, help="The number of images to display. Only relevant if --display_images is true. Default: 5")
 parser.add_argument("--gpus_used", type=int, default=1, help="The number of GPU's to use for training. Only applicable for training with ADE20K. This input argument deprecates the '--num-gpus' argument. Default: 1")
-parser.add_argument("--num_epochs", type=int, default=2, help="The number of epochs to train the model for. Default: 1")
+parser.add_argument("--num_epochs", type=int, default=4, help="The number of epochs to train the model for. Default: 1")
 parser.add_argument("--learning_rate", type=float, default=5e-3, help="The initial learning rate used for training the model. Default 1e-4")
 parser.add_argument("--crop_enabled", type=str2bool, default=False, help="Whether or not cropping is allowed on the images. Default: False")
 parser.add_argument("--inference_only", type=str2bool, default=False, help="Whether or not training is skipped and only inference is run. This input argument deprecates the '--eval_only' argument. Default: False")
@@ -62,10 +58,10 @@ parser.add_argument("--display_images", type=str2bool, default=False, help="Whet
 parser.add_argument("--use_checkpoint", type=str2bool, default=True, help="Whether or not we are loading weights from a model checkpoint file before training. Only applicable when using ADE20K dataset. Default: False")
 parser.add_argument("--use_transformer_backbone", type=str2bool, default=True, help="Whether or now we are using the extended swin_small_transformer backbone. Only applicable if '--use_per_pixel_baseline'=False. Default: False")
 parser.add_argument("--use_per_pixel_baseline", type=str2bool, default=False, help="Whether or now we are using the per_pixel_calculating head. Alternative is the MaskFormer (or transformer) heads. Default: False")
-parser.add_argument("--debugging", type=str2bool, default=True, help="Whether or not we are debugging the script. Default: False")
+parser.add_argument("--debugging", type=str2bool, default=False, help="Whether or not we are debugging the script. Default: False")
 # Parse the arguments into a Namespace variable
 FLAGS = parser.parse_args()
-FLAGS = main(changeFLAGS(FLAGS))
+FLAGS = changeFLAGS(FLAGS)
 
 # Setup functions
 assign_free_gpus(max_gpus=FLAGS.num_gpus)                                   # Assigning the running script to the selected amount of GPU's with the largest memory available
@@ -74,11 +70,16 @@ if "vitrolife" in FLAGS.dataset_name.lower():                               # If
 else:                                                                       # Otherwise, if we are working on the ade20k dataset ...
     for split in ["train", "val"]:                                          # ... then we will find the training and the validation set
         MetadataCatalog["ade20k_sem_seg_{:s}".format(split)].num_files_in_dataset = len(DatasetCatalog["ade20k_sem_seg_{:s}".format(split)]())  # ... and create a key-value pair telling the number of files in the dataset
+
+# Create the initial configuration, define FLAGS epoch variables and alter the configuration
 cfg = createVitrolifeConfiguration(FLAGS=FLAGS)                             # Create the custom configuration used to e.g. build the model
 FLAGS.num_train_files = MetadataCatalog[cfg.DATASETS.TRAIN[0]].num_files_in_dataset # Write the number of training files to the FLAGS namespace
 FLAGS.num_val_files = MetadataCatalog[cfg.DATASETS.TEST[0]].num_files_in_dataset    # Write the number of validation files to the FLAGS namespace
 FLAGS.epoch_iter = int(np.floor(np.divide(FLAGS.num_train_files, FLAGS.batch_size)))# Compute the number of iterations per training epoch
-cfg.SOLVER.MAX_ITER = FLAGS.epoch_iter
+cfg = changeConfig_withFLAGS(cfg=cfg, FLAGS=FLAGS)                          # Set the final values for the config
+
+# cfg.SOLVER.CHECKPOINT_PERIOD = 0
+
 
 # Return the values again
 def setup_func(): return FLAGS, cfg

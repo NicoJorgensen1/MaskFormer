@@ -41,10 +41,12 @@ if FLAGS.inference_only == False:
     # Train the model
     for epoch in range(FLAGS.num_epochs):
         print("Starting epoch {:d}".format(epoch+1))
-        launch_custom_training(args=FLAGS, config=cfg)                      # Launch the training loop for one epoch
+        trainer_class = launch_custom_training(FLAGS=FLAGS, config=cfg)     # Launch the training loop for one epoch
         cfg = putModelWeights(cfg)                                          # Assign the newest model weights to the config
-        eval_train_results = evaluateResults(FLAGS, cfg, data_split="train")# Evaluate the result metrics on the training set
-        eval_val_results = evaluateResults(FLAGS, cfg, data_split="val")    # Evaluate the result metrics on the training set
+        eval_train_results = evaluateResults(FLAGS, cfg, data_split="train", trainer=trainer_class) # Evaluate the result metrics on the training set
+        eval_val_results = evaluateResults(FLAGS, cfg, data_split="val", trainer=trainer_class)     # Evaluate the result metrics on the training set
+        os.rename(os.path.join(cfg.OUTPUT_DIR, "metrics.json"),             # Rename the metrics.json to metricsX.json ...
+            os.path.join(cfg.OUTPUT_DIR, "metrics_{:d}.json".format(epoch+1)))  # ... where X is the current epoch number
     
 
     # Visualize the same images, now with a trained model
@@ -53,8 +55,6 @@ if FLAGS.inference_only == False:
 
 # Evaluation on the vitrolife test dataset. There is no ADE20K test dataset.
 if FLAGS.debugging == False and "vitrolife" in FLAGS.dataset_name.lower():  # Inference will only be performed if we are not debugging the model and working on the vitrolife dataset
-    rename_output_inference_folder(config=cfg)                              # Rename the "inference" folder in OUTPUT_DIR to "validation" before doing inference
-    FLAGS.eval_only = True                                                  # Letting the model know we will only perform evaluation here
     cfg.DATASETS.TEST = ("vitrolife_dataset_test",)                         # The inference will be done on the test dataset
     eval_train_results = evaluateResults(FLAGS, cfg, data_split="test")     # Evaluate the result metrics on the validation set
 

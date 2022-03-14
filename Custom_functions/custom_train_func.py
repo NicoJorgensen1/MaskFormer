@@ -1,7 +1,7 @@
 # Import libraries 
 from detectron2.utils import comm
 from detectron2.checkpoint import DetectionCheckpointer
-from detectron2.engine import default_setup, launch
+from detectron2.engine import default_setup
 from detectron2.evaluation import verify_results
 from detectron2.utils.logger import setup_logger
 from custom_goto_trainer_class import My_GoTo_Trainer
@@ -31,18 +31,11 @@ def run_train_func(FLAGS):
     trainer = My_GoTo_Trainer(cfg)
     trainer.resume_or_load(resume=FLAGS.resume)
     trainer.train()
-    return
+    return trainer
 
 
 # Function to launch the training
 def launch_custom_training(FLAGS, config):
-    print("Command Line FLAGS:", FLAGS)
     FLAGS.config = config
-    launch(
-        run_train_func,
-        FLAGS.num_gpus,
-        num_machines=FLAGS.num_machines,
-        machine_rank=FLAGS.machine_rank,
-        dist_url=FLAGS.dist_url,
-        FLAGS=(FLAGS,),
-    )
+    trainer_class = run_train_func(FLAGS=FLAGS)
+    return trainer_class
