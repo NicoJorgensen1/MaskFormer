@@ -1,10 +1,9 @@
 # Import libraries
 import os
-import pandas as pd
+import json
 import numpy as np
 import matplotlib.pyplot as plt
 from natsort import natsorted
-from visualize_vitrolife_batch  import extractNumbersFromString
 
 
 # Define a function to compute the moving average of an input array or list
@@ -18,31 +17,33 @@ def mov_avg_array(inp_array, mov_of_last_n_elements=4, output_last_n_elements=1)
 
 
 # Define a function to load the metrics.json in each output directory
-def load_metrics(config):
+def load_json_metrics(config):
     metrics_list = [os.path.join(config["OUTPUT_DIR"], x) for x                                         # Iterate through the files in the output dir of the config file ...
         in os.listdir(config["OUTPUT_DIR"]) if x.startswith("metrics") and x.endswith(".json")]         # ... and extract the metrics.json filenames
     metrics_list = natsorted(metrics_list)                                                              # Perform natural sorting on the list of metrics files to assure that their epoch number are sorted
-    metrics_df = pd.DataFrame()
-    for epoch_idx, metrics_file in enumerate(metrics_list):
-        df = pd.read_json(os.path.join(metrics_file), orient="records", lines=True)                     # Read the metrics.json as a pandas dataframe
-        df.sort_values("iteration")                                                                     # Sort the dataframe by the iteration count
-        df = df[~df["total_loss"].isna()].dropna(axis=1, how="all")                                     # Drop all rows where the total loss is NaN for all rows...
-        df["epoch_num"] = np.repeat(a=epoch_idx+1, repeats=df.shape[0]).tolist()                        # Create a new row stating the epoch number
-        metrics_df = pd.concat([metrics_df, df], axis=0, join="outer")                                  # Concatenate the dataframe from this epoch to the stack of dataframes
-    metrics_dict = metrics_df.to_dict(orient="list")                                                    # Convert the dataframe with loss values into a dictionary
-    for key in metrics_dict.keys():                                                                     # Looping through all key values in the training metrics dictionary
+    metrics = {"epoch_num": list()}
+    for epoch_idx, metric_file in enumerate(metrics_list):
+        for it_idx, line in enumerate(open(metric_file)):
+            vals = json.loads(line)
+            for key in vals:
+                if key not in list(metrics.keys()): metrics[key] = list()
+                metrics[key].append(vals[key])
+        metrics["epoch_num"].extend(np.repeat(a=epoch_idx+1, repeats=it_idx+1).tolist())
+    for key in metrics.keys():                                                                          # Looping through all key values in the training metrics dictionary
         if "loss" not in key.lower(): continue                                                          # If the key is not a loss-key, skip to the next key
         key_val, mov_avg_val = list(), list()                                                           # Initiate lists to store the actual values and the moving-average computed values
-        for item in metrics_dict[key]:                                                                  # Loop through each item in the dict[key]->value list
+        for item in metrics[key]:                                                                       # Loop through each item in the dict[key]->value list
             key_val.append(item)                                                                        # Append the actual item value to the key_val list
             mov_avg_val.append(mov_avg_array(inp_array=key_val, mov_of_last_n_elements=10, output_last_n_elements=1).item())    # Compute the next mov_avg val for the last 10 elements
-        metrics_dict[key] = mov_avg_val                                                                 # Assign the newly computed moving average of the dict[key]->values to the dictionary
-    return metrics_dict                                                                                 # Return the moving average value dictionary
+        metrics[key] = mov_avg_val                                                                      # Assign the newly computed moving average of the dict[key]->values to the dictionary
+    return metrics                                                                                      # Return the moving average value dictionary
 
 
 # Function to display learning curves
 def show_history(config, FLAGS):                                                                        # Define a function to visualize the learning curves
-    history = load_metrics(config=config)                                                               # Load the metrics into the history dictionary
+    # train_history = load_json_metrics(config=config)                                                    # Load the metrics into the history dictionary
+    history = load_json_metrics(config=config)
+    # val_history 
     loss_total = [key for key in history.keys() if "total_loss" in key.lower()]                         # Find all keys with loss_ce
     loss_ce = [key for key in history.keys() if "loss_ce" in key.lower()]                               # Find all keys with loss_ce
     loss_dice = [key for key in history.keys() if "loss_dice" in key.lower()]                           # Find all keys with loss_dice

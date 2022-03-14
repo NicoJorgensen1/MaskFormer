@@ -112,8 +112,7 @@ def visualize_the_images(config, FLAGS, position=[0.55, 0.08, 0.40, 0.75], data_
         img_ytrue_ypred, data_batch, FLAGS = create_batch_img_ytrue_ypred(config=config,# Create the batch of images that needs to be visualized
                 data_split=data_split, FLAGS=FLAGS, data_batch=data_batch)          # And return the images in the data_batch dictionary
         num_rows, num_cols = 3, FLAGS.num_images                                    # The figure will have three rows (input, y_pred, y_true) and one column per image
-        fig = plt.figure(figsize=(int(np.ceil(FLAGS.num_images*5.5)), 8))           # Create the figure object
-        fig = plt.figure()
+        fig = plt.figure(figsize=(int(np.ceil(FLAGS.num_images*4.5)), 8))           # Create the figure object
         row = 0                                                                     # Initiate the row index counter (all manual indexing could have been avoided by having created img_ytrue_ypred as an OrderedDict)
         for key in img_ytrue_ypred.keys():                                          # Loop through all the keys in the batch dictionary
             if key.lower() not in ['input', 'y_true', 'y_pred']: continue           # If the key is not one of (input, y_pred, y_true), we simply skip to the next one

@@ -24,8 +24,8 @@ assert os.path.isdir(dataset_dir), "The dataset directory doesn't exist in the c
 os.environ["DETECTRON2_DATASETS"] = dataset_dir
 
 # Import important libraries
-from custom_setup_func import rename_output_inference_folder, setup_func, zip_output    # Functions to rename output dir and assign to GPU, register vitrolife dataset, create config and zip output_dir
-from custom_train_func import launch_custom_training                        # Function to launch the training with custom dataset
+from custom_setup_func import setup_func, zip_output                        # Functions to assign script to GPU, register vitrolife dataset, create config and zip output_dir
+from custom_train_func import launch_custom_training                        # Function to launch the training with the given dataset
 from visualize_vitrolife_batch import putModelWeights, visualize_the_images # Function to assign the model_weights to the config and a function used for visualizing the image batch
 from show_learning_curves import show_history                               # Function used to plot the learning curves for the given training
 from custom_evaluation_func import evaluateResults                          # Function to evaluate the metrics for the segmentation
@@ -42,11 +42,12 @@ if FLAGS.inference_only == False:
     for epoch in range(FLAGS.num_epochs):
         print("Starting epoch {:d}".format(epoch+1))
         trainer_class = launch_custom_training(FLAGS=FLAGS, config=cfg)     # Launch the training loop for one epoch
+        os.rename(os.path.join(cfg.OUTPUT_DIR, "metrics.json"),             # Rename the metrics.json to metricsX.json ...
+            os.path.join(cfg.OUTPUT_DIR, "metrics_{:d}.json".format(epoch+1)))  # ... where X is the current epoch number
         cfg = putModelWeights(cfg)                                          # Assign the newest model weights to the config
         eval_train_results = evaluateResults(FLAGS, cfg, data_split="train", trainer=trainer_class) # Evaluate the result metrics on the training set
         eval_val_results = evaluateResults(FLAGS, cfg, data_split="val", trainer=trainer_class)     # Evaluate the result metrics on the training set
-        os.rename(os.path.join(cfg.OUTPUT_DIR, "metrics.json"),             # Rename the metrics.json to metricsX.json ...
-            os.path.join(cfg.OUTPUT_DIR, "metrics_{:d}.json".format(epoch+1)))  # ... where X is the current epoch number
+        # fig_learn_curves = show_history(config=cfg, FLAGS=FLAGS)            # Create and save learning curves 
     
 
     # Visualize the same images, now with a trained model
@@ -56,10 +57,9 @@ if FLAGS.inference_only == False:
 # Evaluation on the vitrolife test dataset. There is no ADE20K test dataset.
 if FLAGS.debugging == False and "vitrolife" in FLAGS.dataset_name.lower():  # Inference will only be performed if we are not debugging the model and working on the vitrolife dataset
     cfg.DATASETS.TEST = ("vitrolife_dataset_test",)                         # The inference will be done on the test dataset
-    eval_train_results = evaluateResults(FLAGS, cfg, data_split="test")     # Evaluate the result metrics on the validation set
+    eval_test_results = evaluateResults(FLAGS, cfg, data_split="test")      # Evaluate the result metrics on the validation set
 
-# Display learning curves
-fig_learn_curves = show_history(config=cfg, FLAGS=FLAGS)                    # Create and save learning curves
+
 
 # Zip the resulting output directory
 zip_output(cfg)
