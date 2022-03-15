@@ -61,16 +61,17 @@ if FLAGS.inference_only == False:
         train_pq_results = pq_evaluation(args=FLAGS, config=cfg, data_split="train")# Evaluate the Panoptic Quality for the training semantic segmentation results
 
         # Validation period. Will 'train' with lr=0 on validation data, correct the metrics files and evaluate performance on validation data
-        cfg = putModelWeights(cfg)                                                  # Assign the latest model weights to the config
-        cfg.DATASETS.TRAIN = val_dataset                                            # Change the 'train_dataset' variable to the validation dataset ...
-        cfg.SOLVER.BASE_LR = float(0)                                               # Set the learning rate to 0
-        validator_class = launch_custom_training(FLAGS=FLAGS, config=cfg)           # ... and then "train" the model, i.e. compute losses, wi
-        shutil.copyfile(os.path.join(cfg.OUTPUT_DIR, "metrics.json"),               # Rename the metrics.json to val_metricsX.json ...
-            os.path.join(cfg.OUTPUT_DIR, "val_metrics_{:d}.json".format(epoch+1)))  # ... where X is the current epoch number
-        os.remove(os.path.join(cfg.OUTPUT_DIR, "metrics.json"))                     # Remove the original metrics file
-        os.remove(os.path.join(cfg.OUTPUT_DIR, "model_final.pth"))                  # Remove the model that will be saved after validation
-        eval_val_results = evaluateResults(FLAGS, cfg, data_split="val", trainer=trainer_class) # Evaluate the result metrics on the training set
-        val_pq_results = pq_evaluation(args=FLAGS, config=cfg, data_split="val")    # Evaluate the Panoptic Quality for the validation semantic segmentation results
+        if FLAGS.debugging == False:                                                # We wont perform validation, if we are debugging the model
+            cfg = putModelWeights(cfg)                                              # Assign the latest model weights to the config
+            cfg.DATASETS.TRAIN = val_dataset                                        # Change the 'train_dataset' variable to the validation dataset ...
+            cfg.SOLVER.BASE_LR = float(0)                                           # Set the learning rate to 0
+            validator_class = launch_custom_training(FLAGS=FLAGS, config=cfg)       # ... and then "train" the model, i.e. compute losses, wi
+            shutil.copyfile(os.path.join(cfg.OUTPUT_DIR, "metrics.json"),           # Rename the metrics.json to val_metricsX.json ...
+                os.path.join(cfg.OUTPUT_DIR, "val_metrics_{:d}.json".format(epoch+1)))  # ... where X is the current epoch number
+            os.remove(os.path.join(cfg.OUTPUT_DIR, "metrics.json"))                 # Remove the original metrics file
+            os.remove(os.path.join(cfg.OUTPUT_DIR, "model_final.pth"))              # Remove the model that will be saved after validation
+            eval_val_results = evaluateResults(FLAGS, cfg, data_split="val", trainer=trainer_class) # Evaluate the result metrics on the training set
+            val_pq_results = pq_evaluation(args=FLAGS, config=cfg, data_split="val")# Evaluate the Panoptic Quality for the validation semantic segmentation results
         
         # Prepare for the training phase of the next epoch. Switch back to training dataset, save history and learning curves and visualize segmentation results
         cfg.DATASETS.TRAIN = train_dataset                                          # Set the 'dataset_train' variable back to the training data

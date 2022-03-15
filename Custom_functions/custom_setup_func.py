@@ -38,6 +38,7 @@ def changeFLAGS(FLAGS):
     if "vitrolife" in FLAGS.dataset_name.lower() : FLAGS.num_gpus = 1       # Working with the Vitrolife dataset can only be done using a single GPU for some weird reason...
     if FLAGS.eval_only != FLAGS.inference_only: FLAGS.eval_only = FLAGS.inference_only  # As there are two inputs where "eval_only" can be set, inference_only is the superior
     if FLAGS.min_delta < 1.0: FLAGS.min_delta *= 100                        # As the model outputs metrics multiplied by a factor of 100, the min_delta value must also be scaled accordingly
+    if FLAGS.debugging: FLAGS.eval_metric.replace("val", "train")           # The metric used for evaluation will be a training metric, if we are debugging the model
     return FLAGS
 
 # Save history dictionary
@@ -94,12 +95,8 @@ FLAGS.num_train_files = MetadataCatalog[cfg.DATASETS.TRAIN[0]].num_files_in_data
 FLAGS.num_val_files = MetadataCatalog[cfg.DATASETS.TEST[0]].num_files_in_dataset    # Write the number of validation files to the FLAGS namespace
 FLAGS.epoch_iter = int(np.floor(np.divide(FLAGS.num_train_files, FLAGS.batch_size)))# Compute the number of iterations per training epoch
 FLAGS.num_classes = len(MetadataCatalog[cfg.DATASETS.TRAIN[0]].stuff_classes)       # Get the number of classes in the current dataset
-
-# FLAGS.epoch_iter = 100
-
-
 cfg = changeConfig_withFLAGS(cfg=cfg, FLAGS=FLAGS)                          # Set the final values for the config
-cfg.SOLVER.CHECKPOINT_PERIOD = FLAGS.epoch_iter
+cfg.SOLVER.CHECKPOINT_PERIOD = FLAGS.epoch_iter                             # We'll only save a new model after each epoch
 
 # Return the values again
 def setup_func(): return FLAGS, cfg
