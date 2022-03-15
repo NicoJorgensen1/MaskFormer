@@ -50,7 +50,7 @@ def SaveHistory(historyObject, save_folder, historyName="history"):         # Fu
 # Running the parser function. By doing it like this the FLAGS will get out of the main function
 parser = default_argument_parser()
 start_time = datetime.now().strftime("%H_%M_%d%b%Y").upper()
-parser.add_argument("--dataset_name", type=str, default="ade20k", help="Which datasets to train on. Choose between [ADE20K, Vitrolife]. Default: Vitrolife")
+parser.add_argument("--dataset_name", type=str, default="vitrolife", help="Which datasets to train on. Choose between [ADE20K, Vitrolife]. Default: Vitrolife")
 parser.add_argument("--output_dir_postfix", type=str, default=start_time, help="Filename extension to add to the output directory of the current process. Default: now: 'HH_MM_DDMMMYYYY'")
 parser.add_argument("--eval_metric", type=str, default="val_mIoU", help="Metric to use in order to determine the 'best' model weights. Available: val_/train_ prefix to [total_loss, mIoU, fIoU, mACC]. Default: val_mIoU")
 parser.add_argument("--num_workers", type=int, default=1, help="Number of workers to use for training the model. Default: 1")
@@ -62,7 +62,7 @@ parser.add_argument("--batch_size", type=int, default=1, help="The batch size us
 parser.add_argument("--num_images", type=int, default=5, help="The number of images to display. Only relevant if --display_images is true. Default: 5")
 parser.add_argument("--display_rate", type=int, default=2, help="The epoch_rate of how often to display image segmentations. A display_rate of 3 means that every third epoch, visual segmentations are saved. Default: 3")
 parser.add_argument("--gpus_used", type=int, default=1, help="The number of GPU's to use for training. Only applicable for training with ADE20K. This input argument deprecates the '--num-gpus' argument. Default: 1")
-parser.add_argument("--num_epochs", type=int, default=1, help="The number of epochs to train the model for. Default: 1")
+parser.add_argument("--num_epochs", type=int, default=3, help="The number of epochs to train the model for. Default: 1")
 parser.add_argument("--patience", type=int, default=5, help="The number of epochs to accept that the model hasn't improved before lowering the learning rate by a factor '--lr_gamma'. Default: 5")
 parser.add_argument("--early_stop_patience", type=int, default=15, help="The number of epochs to accept that the model hasn't improved before terminating training. Default: 15")
 parser.add_argument("--learning_rate", type=float, default=7.5e-3, help="The initial learning rate used for training the model. Default 7.5e-3")
@@ -93,6 +93,11 @@ cfg = createVitrolifeConfiguration(FLAGS=FLAGS)                             # Cr
 FLAGS.num_train_files = MetadataCatalog[cfg.DATASETS.TRAIN[0]].num_files_in_dataset # Write the number of training files to the FLAGS namespace
 FLAGS.num_val_files = MetadataCatalog[cfg.DATASETS.TEST[0]].num_files_in_dataset    # Write the number of validation files to the FLAGS namespace
 FLAGS.epoch_iter = int(np.floor(np.divide(FLAGS.num_train_files, FLAGS.batch_size)))# Compute the number of iterations per training epoch
+
+
+# FLAGS.epoch_iter = 100
+
+
 cfg = changeConfig_withFLAGS(cfg=cfg, FLAGS=FLAGS)                          # Set the final values for the config
 cfg.SOLVER.CHECKPOINT_PERIOD = FLAGS.epoch_iter
 

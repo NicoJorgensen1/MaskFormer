@@ -33,6 +33,7 @@ from visualize_vitrolife_batch import putModelWeights, visualize_the_images     
 from show_learning_curves import show_history                                       # Function used to plot the learning curves for the given training
 from custom_evaluation_func import evaluateResults                                  # Function to evaluate the metrics for the segmentation
 from custom_callback_functions import early_stopping, lr_scheduler, keepAllButLatestAndBestModel    # Callback functions for early stopping, lr_scheduling and ModelCheckpoints
+from custom_pq_eval_func import pq_evaluation
 
 
 # Get the FLAGS and config variables
@@ -95,6 +96,10 @@ if FLAGS.inference_only == False:
 if FLAGS.debugging == False and "vitrolife" in FLAGS.dataset_name.lower():          # Inference will only be performed if we are not debugging the model and working on the vitrolife dataset
     cfg.DATASETS.TEST = ("vitrolife_dataset_test",)                                 # The inference will be done on the test dataset
     eval_test_results = evaluateResults(FLAGS, cfg, data_split="test")              # Evaluate the result metrics on the validation set with the best performing model
+
+# Evaluate the Panoptic Quality for the semantic segmentation results
+pq_evaluation(args=FLAGS, config=cfg, data_split="train")
+pq_evaluation(args=FLAGS, config=cfg, data_split="val")
 
 
 # Zip the resulting output directory

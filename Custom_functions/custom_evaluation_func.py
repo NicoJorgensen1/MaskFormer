@@ -1,5 +1,6 @@
 # Import the libraries and functions used here
 import sys
+import os
 import torch
 from detectron2.data import DatasetCatalog, DatasetMapper, build_detection_train_loader
 from detectron2.evaluation import SemSegEvaluator
@@ -11,10 +12,12 @@ def evaluateResults(FLAGS, cfg, data_split="train", trainer=My_GoTo_Trainer):
     # Get the correct properties
     dataset_name = cfg.DATASETS.TRAIN[0] if "train" in data_split.lower() else cfg.DATASETS.TEST[0]         # Get the name of the dataset that will be evaluated
     dataset_num_files = FLAGS.num_train_files if "train" in data_split.lower() else FLAGS.num_val_files     # Get the number of files 
+    pred_out_dir = os.path.join(cfg.OUTPUT_DIR, "Predictions", data_split)                                  # The path of where to store the resulting evaluation
+    os.makedirs(pred_out_dir, exist_ok=True)                                                                # Create the evaluation folder, if it doesn't already exist
 
     # Create the predictor and evaluator instances
     predictor = DefaultPredictor(cfg=cfg)
-    evaluator = SemSegEvaluator(dataset_name=dataset_name, output_dir=cfg.OUTPUT_DIR)
+    evaluator = SemSegEvaluator(dataset_name=dataset_name, output_dir=pred_out_dir)
     evaluator.reset()
     model = trainer.build_model(cfg)
 

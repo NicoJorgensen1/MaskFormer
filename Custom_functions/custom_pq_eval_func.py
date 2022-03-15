@@ -1,40 +1,18 @@
 #!/usr/bin/env python
 # Copyright (c) Facebook, Inc. and its affiliates.
 
-import argparse
 import json
 import os
+import torch
+import numpy as np
 from collections import defaultdict
 from tqdm import tqdm
-
-import numpy as np
-import torch
-
 from detectron2.data import MetadataCatalog
 from detectron2.data.detection_utils import read_image
 from detectron2.utils.file_io import PathManager
 from pycocotools import mask as maskUtils
-
 from panopticapi.evaluation import PQStat
 
-
-def default_argument_parser():
-    """
-    Creates a parser with some common arguments used by analysis tools.
-    Returns:
-        argparse.ArgumentParser:
-    """
-    parser = argparse.ArgumentParser(description="Evaluate PQ metric for semantic segmentation.")
-    # NOTE: currently does not support Cityscapes, you need to convert
-    # Cityscapes prediction format to Detectron2 prediction format.
-    parser.add_argument(
-        "--dataset-name",
-        default="ade20k_sem_seg_val",
-        choices=["ade20k_sem_seg_val", "coco_2017_test_stuff_10k_sem_seg", "ade20k_full_sem_seg_val"],
-        help="dataset name you want to evaluate")
-    parser.add_argument("--json-file", default="", help="path to detection json file")
-
-    return parser
 
 
 # Modified from the official panoptic api: https://github.com/cocodataset/panopticapi/blob/master/panopticapi/evaluation.py
@@ -136,9 +114,10 @@ def pq_compute_single_image(segm_gt, segm_dt, categories, ignore_label):
     return pq_stat
 
 
-def main():
-    parser = default_argument_parser()
-    args = parser.parse_args()
+def pq_evaluation(args, config, data_split="train"):
+    if data_split == "train": args.dataset_name = config.DATASETS.TRAIN[0]
+    elif data_split == "val": args.dataset_name = config.DATASETS.TEST[0]
+    args.json_file = os.path.join(cfg.OUTPUT_DIR, "Predictions", data_split, "sem_seg_predictions.json")
 
     _root = os.getenv("DETECTRON2_DATASETS", "datasets")
     json_file = args.json_file
@@ -239,8 +218,3 @@ def main():
 
     print("")
     print(f"mIoU: {miou}")
-
-
-if __name__ == '__main__':
-    parser = default_argument_parser()
-    main()
