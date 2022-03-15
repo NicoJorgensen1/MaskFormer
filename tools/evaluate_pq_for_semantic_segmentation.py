@@ -242,4 +242,5 @@ def main():
 
 
 if __name__ == '__main__':
+    parser = default_argument_parser()
     main()

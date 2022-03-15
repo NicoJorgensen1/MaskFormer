@@ -77,7 +77,7 @@ def show_history(config, FLAGS, metrics_train, metrics_eval, history=None):     
         keys_to_remove = [key for key in hist_key_list if "background" in key.lower() or not np.isnan(extractNumbersFromString(key))]   # If the key_name contains "background" or a number ...
         [hist_keys[key_idx].remove(key) for key in keys_to_remove]                                      # ..., i.e. the [0,1,2,3,4] losses (what ever those are) then remove that key from the list
     ax_titles = ["Total_loss", "mIoU and fIoU", "Loss_CE", "Loss_dice", "Loss_mask",                    # Create titles and ylabels ...
-                "mACC and pACC", "Pixel accuracy per class", "Learning_rate", "IoU per class"]          # ... for the axes
+                "mACC and pACC", "Learning_rate", "Pixel accuracy per class", "IoU per class"]          # ... for the axes
     colors = ["blue", "red", "black", "green", "magenta", "cyan", "yellow", "deeppink", "purple",       # Create colors for ... 
                 "peru", "darkgrey", "gold", "springgreen", "orange", "crimson", "lawngreen"]            # ... the line plots
     fig = plt.figure(figsize=(16,18.5))                                                                 # Create the figure
@@ -112,7 +112,7 @@ def show_history(config, FLAGS, metrics_train, metrics_eval, history=None):     
     return history                                                                                      # The history dictionary is returned
 
 
-history = show_history(config=cfg, FLAGS=FLAGS, metrics_train=eval_train_results["sem_seg"], metrics_eval=eval_val_results["sem_seg"])
+# history = show_history(config=cfg, FLAGS=FLAGS, metrics_train=eval_train_results["sem_seg"], metrics_eval=eval_val_results["sem_seg"])
 
 
 

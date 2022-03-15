@@ -45,7 +45,6 @@ val_dataset = cfg.DATASETS.TEST
 base_lr = cfg.SOLVER.BASE_LR
 
 
-
 # Visualize some random images
 fig_list_before, data_batches, cfg, FLAGS = visualize_the_images(config=cfg, FLAGS=FLAGS)   # Visualize some segmentations on random images before training
 

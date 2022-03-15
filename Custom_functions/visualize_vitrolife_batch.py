@@ -33,7 +33,7 @@ def apply_colormap(mask, config):
     colors_used = list(MetadataCatalog[config.DATASETS.TEST[0]].stuff_colors)       # Read the colors used in the Metadatacatalog. If no colors are assigned, random colors are used
     if "vitrolife" in config.DATASETS.TEST[0].lower():                              # If we are working on the vitrolife dataset ...
         labels_used = list(MetadataCatalog[config.DATASETS.TEST[0]].stuff_dataset_id_to_contiguous_id.values()) # ... labels_used will be read from the MetadataCatalog
-    else: labels_used = list(range(1, 1+len(MetadataCatalog["ade20k_sem_seg_train"].stuff_classes)))    # Else, labels is just 1:num_classes
+    else: labels_used = list(range(len(MetadataCatalog["ade20k_sem_seg_train"].stuff_classes))) # Else, labels is just 0:num_classes-1
     color_array = np.zeros((mask.shape[0], mask.shape[1], 3), dtype=np.uint8)       # Allocate a RGB 3D array of zeros
     for label_idx, label in enumerate(labels_used):                                 # Loop through each label from the labels_used found from the MetadataCatalog
         color_array[mask == label] = colors_used[label_idx]                         # Assign all pixels in the mask with the current label_value the colors_used[idx] value
@@ -114,7 +114,7 @@ def visualize_the_images(config, FLAGS, position=[0.55, 0.08, 0.40, 0.75], epoch
     fig_list, data_batches_final = list(), list()                                   # Initiate the list to store the figures in
     if data_batches==None: data_batches = [None, None, None]                        # If no previous data has been sent, it must be a list of None's...
     for data_split, data_batch in zip(["train", "val", "test"], data_batches):      # Iterate through the three splits available
-        if "vitrolife" not in FLAGS.dataset_name.lower(): continue                  # Only vitrolife has a test dataset. ADE20K doesn't. 
+        if "vitrolife" not in FLAGS.dataset_name.lower() and data_split=="test": continue   # Only vitrolife has a test dataset. ADE20K doesn't. 
         # Extract information about the dataset used
         img_ytrue_ypred, data_batch, FLAGS = create_batch_img_ytrue_ypred(config=config,# Create the batch of images that needs to be visualized
                 data_split=data_split, FLAGS=FLAGS, data_batch=data_batch)          # And return the images in the data_batch dictionary
