@@ -4,13 +4,11 @@ import torch
 from detectron2.data import DatasetCatalog, DatasetMapper, build_detection_train_loader
 from detectron2.evaluation import SemSegEvaluator
 from detectron2.engine.defaults import DefaultPredictor
-from visualize_vitrolife_batch import putModelWeights
 from custom_goto_trainer_class import My_GoTo_Trainer
 from tqdm import tqdm
 
 def evaluateResults(FLAGS, cfg, data_split="train", trainer=My_GoTo_Trainer):
     # Get the correct properties
-    cfg = putModelWeights(config=cfg)
     dataset_name = cfg.DATASETS.TRAIN[0] if "train" in data_split.lower() else cfg.DATASETS.TEST[0]         # Get the name of the dataset that will be evaluated
     dataset_num_files = FLAGS.num_train_files if "train" in data_split.lower() else FLAGS.num_val_files     # Get the number of files 
 
@@ -47,4 +45,3 @@ def evaluateResults(FLAGS, cfg, data_split="train", trainer=My_GoTo_Trainer):
 
     # Return the results
     return eval_metrics_results
-

@@ -47,19 +47,20 @@ def SaveHistory(historyObject, save_folder, historyName="history"):         # Fu
     hist_file.close()                                                       # Close the pickle again  
 
 # Define a function to delete all models but the 
-def keepAllButLatestAndBestModel(cfg, history, FLAGS, bestOrLatest="latest"):
-    mode = "min" if "loss" in FLAGS.eval_metric.lower() else "max"                  # Whether a lower value or a higher value is better
+def keepAllButLatestAndBestModel(cfg, history, FLAGS, bestOrLatest="latest", delete_leftovers=True):
     model_files = natsorted([x for x in os.listdir(cfg.OUTPUT_DIR) if "model_epoch" in x.lower()])  # Get a list of available models
-    epoch_numbers = [extractNumbersFromString(x, dtype=int) for x in model_files]   # Extract which epoch each model are from
-    metric_list = history[FLAGS.eval_metric]                                        # Read the list of values for the metric chosen to use as 
-    best_epoch = np.argmin(metric_list) if mode=="min" else np.argmax(metric_list)+1# Get the epoch number of the best epoch
-    best_model = model_files[best_epoch]
-    latest_epoch = np.max(epoch_numbers)                                            # Get the epoch number of the latest epoch
-    latest_model = model_files[np.argmax(epoch_numbers)] 
-    models_not_kept = [model for epoch, model in zip(epoch_numbers, model_files) if epoch != best_epoch or epoch != latest_epoch]   # Get the models that are neither the best model or latest model
-    [os.remove(os.path.join(cfg.OUTPUT_DIR, model)) for model in models_not_kept]   # Delete all the model weights that are neither the best or the latest weights
-    cfg.MODEL.WEIGHTS = os.path.join(cfg.OUTPUT_DIR, best_model if bestOrLatest=="best" else latest_model)  # Set the model weights as either the best or the latest model
-    return cfg                                                                      # Return the config where the cfg.MODEL.WEIGHTS are set to the chosen model
+    if len(model_files) >= 1:
+        mode = "min" if "loss" in FLAGS.eval_metric.lower() else "max"      # Whether a lower value or a higher value is better
+        epoch_numbers = [extractNumbersFromString(x, dtype=int) for x in model_files]   # Extract which epoch each model are from
+        metric_list = history[FLAGS.eval_metric]                            # Read the list of values for the metric chosen to use as 
+        metric_list = np.asarray(metric_list)[np.subtract(epoch_numbers,1)].tolist()    # Get the remaining values (i.e. if some models have already been deleted, their corresponding values should be removed)
+        best_model_idx = np.argmin(metric_list) if mode=="min" else np.argmax(metric_list)  # Get the idx of the best epoch
+        best_model = model_files[best_model_idx]                            # Get the model name of the best model
+        latest_model = model_files[np.argmax(epoch_numbers)]                # Get the model name of the latest model
+        if delete_leftovers == True:                                        # If we want to delete the leftovers ...
+            [os.remove(os.path.join(cfg.OUTPUT_DIR, x)) for x in model_files if not any([x==best_model, x==latest_model])]  # ... remove the models that are neither the best or latest model
+        cfg.MODEL.WEIGHTS = os.path.join(cfg.OUTPUT_DIR, latest_model if "latest" in bestOrLatest.lower() else best_model)  # Set the model weights as either the best or the latest model
+    return cfg                                                              # Return the config where the cfg.MODEL.WEIGHTS are set to the chosen model
 
 
 # Running the parser function. By doing it like this the FLAGS will get out of the main function
@@ -67,7 +68,7 @@ parser = default_argument_parser()
 start_time = datetime.now().strftime("%H_%M_%d%b%Y").upper()
 parser.add_argument("--dataset_name", type=str, default="vitrolife", help="Which datasets to train on. Choose between [ADE20K, Vitrolife]. Default: Vitrolife")
 parser.add_argument("--output_dir_postfix", type=str, default=start_time, help="Filename extension to add to the output directory of the current process. Default: now: 'HH_MM_DDMMMYYYY'")
-parser.add_argument("--eval_metric", type=str, default="val_mIoU", help="Metric to use in order to determine the 'best' model weights. Available: val/train_[total_loss, mIoI, fIoU, pACC]. Default: val_mIoU")
+parser.add_argument("--eval_metric", type=str, default="val_mIoU", help="Metric to use in order to determine the 'best' model weights. Available: val_/train_ prefix to [total_loss, mIoU, fIoU, pACC]. Default: val_mIoU")
 parser.add_argument("--num_workers", type=int, default=1, help="Number of workers to use for training the model. Default: 1")
 parser.add_argument("--max_iter", type=int, default=int(3e1), help="Maximum number of iterations to train the model for. <<Deprecated argument. Use 'num_epochs' instead>>. Default: 100")
 parser.add_argument("--img_size_min", type=int, default=500, help="The length of the smallest size of the training images. Default: 500")
@@ -78,7 +79,7 @@ parser.add_argument("--num_images", type=int, default=5, help="The number of ima
 parser.add_argument("--display_rate", type=int, default=2, help="The epoch_rate of how often to display image segmentations. A display_rate of 3 means that every third epoch, visual segmentations are saved. Default: 3")
 parser.add_argument("--gpus_used", type=int, default=1, help="The number of GPU's to use for training. Only applicable for training with ADE20K. This input argument deprecates the '--num-gpus' argument. Default: 1")
 parser.add_argument("--num_epochs", type=int, default=4, help="The number of epochs to train the model for. Default: 1")
-parser.add_argument("--learning_rate", type=float, default=5e-3, help="The initial learning rate used for training the model. Default 1e-4")
+parser.add_argument("--learning_rate", type=float, default=7.5e-3, help="The initial learning rate used for training the model. Default 7.5e-3")
 parser.add_argument("--crop_enabled", type=str2bool, default=False, help="Whether or not cropping is allowed on the images. Default: False")
 parser.add_argument("--inference_only", type=str2bool, default=False, help="Whether or not training is skipped and only inference is run. This input argument deprecates the '--eval_only' argument. Default: False")
 parser.add_argument("--display_images", type=str2bool, default=False, help="Whether or not some random sample images are displayed before training starts. Default: False")
