@@ -93,6 +93,3 @@ if FLAGS.debugging == False and "vitrolife" in FLAGS.dataset_name.lower():      
 # Zip the resulting output directory
 zip_output(cfg)
 
-
-
-

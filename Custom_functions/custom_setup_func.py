@@ -78,7 +78,7 @@ parser.add_argument("--batch_size", type=int, default=1, help="The batch size us
 parser.add_argument("--num_images", type=int, default=5, help="The number of images to display. Only relevant if --display_images is true. Default: 5")
 parser.add_argument("--display_rate", type=int, default=2, help="The epoch_rate of how often to display image segmentations. A display_rate of 3 means that every third epoch, visual segmentations are saved. Default: 3")
 parser.add_argument("--gpus_used", type=int, default=1, help="The number of GPU's to use for training. Only applicable for training with ADE20K. This input argument deprecates the '--num-gpus' argument. Default: 1")
-parser.add_argument("--num_epochs", type=int, default=4, help="The number of epochs to train the model for. Default: 1")
+parser.add_argument("--num_epochs", type=int, default=6, help="The number of epochs to train the model for. Default: 1")
 parser.add_argument("--learning_rate", type=float, default=7.5e-3, help="The initial learning rate used for training the model. Default 7.5e-3")
 parser.add_argument("--crop_enabled", type=str2bool, default=False, help="Whether or not cropping is allowed on the images. Default: False")
 parser.add_argument("--inference_only", type=str2bool, default=False, help="Whether or not training is skipped and only inference is run. This input argument deprecates the '--eval_only' argument. Default: False")
