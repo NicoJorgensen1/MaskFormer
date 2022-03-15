@@ -3,7 +3,6 @@ import os                                                                   # Us
 import numpy as np                                                          # Used for computing the iterations per epoch
 import argparse                                                             # Used to parse input arguments through command line
 import pickle                                                               # Used to save the history dictionary after training
-from natsort import natsorted                                               # Used to sort the list of model_files saved 
 from datetime import datetime                                               # Used to get the current date and time when starting the process
 from shutil import make_archive                                             # Used to zip the directory of the output folder
 from detectron2.data import DatasetCatalog, MetadataCatalog                 # Catalogs over registered datasets and metadatas for all datasets available in Detectron2
@@ -11,7 +10,6 @@ from detectron2.engine import default_argument_parser                       # De
 from GPU_memory_ranked_assigning import assign_free_gpus                    # Function to assign the script to a given number of GPUs
 from register_vitrolife_dataset import register_vitrolife_data_and_metadata_func        # Register the vitrolife dataset and metadata in the Detectron2 dataset catalog
 from create_custom_config import createVitrolifeConfiguration, changeConfig_withFLAGS   # Function to create a configuration used for training 
-from visualize_vitrolife_batch import extractNumbersFromString, putModelWeights         # Function to extract numbers from a string containing and a function to put a path to the latest model_file in the config file
 
 
 # Function to rename the automatically created "inference" directory in the OUTPUT_DIR from "inference" to "validation" before performing actual inference with the test set
@@ -46,22 +44,6 @@ def SaveHistory(historyObject, save_folder, historyName="history"):         # Fu
     pickle.dump(historyObject, hist_file)                                   # Saves the history dictionary 
     hist_file.close()                                                       # Close the pickle again  
 
-# Define a function to delete all models but the 
-def keepAllButLatestAndBestModel(cfg, history, FLAGS, bestOrLatest="latest", delete_leftovers=True):
-    model_files = natsorted([x for x in os.listdir(cfg.OUTPUT_DIR) if "model_epoch" in x.lower()])  # Get a list of available models
-    if len(model_files) >= 1:
-        mode = "min" if "loss" in FLAGS.eval_metric.lower() else "max"      # Whether a lower value or a higher value is better
-        epoch_numbers = [extractNumbersFromString(x, dtype=int) for x in model_files]   # Extract which epoch each model are from
-        metric_list = history[FLAGS.eval_metric]                            # Read the list of values for the metric chosen to use as 
-        metric_list = np.asarray(metric_list)[np.subtract(epoch_numbers,1)].tolist()    # Get the remaining values (i.e. if some models have already been deleted, their corresponding values should be removed)
-        best_model_idx = np.argmin(metric_list) if mode=="min" else np.argmax(metric_list)  # Get the idx of the best epoch
-        best_model = model_files[best_model_idx]                            # Get the model name of the best model
-        latest_model = model_files[np.argmax(epoch_numbers)]                # Get the model name of the latest model
-        if delete_leftovers == True:                                        # If we want to delete the leftovers ...
-            [os.remove(os.path.join(cfg.OUTPUT_DIR, x)) for x in model_files if not any([x==best_model, x==latest_model])]  # ... remove the models that are neither the best or latest model
-        cfg.MODEL.WEIGHTS = os.path.join(cfg.OUTPUT_DIR, latest_model if "latest" in bestOrLatest.lower() else best_model)  # Set the model weights as either the best or the latest model
-    return cfg                                                              # Return the config where the cfg.MODEL.WEIGHTS are set to the chosen model
-
 
 # Running the parser function. By doing it like this the FLAGS will get out of the main function
 parser = default_argument_parser()
@@ -79,7 +61,11 @@ parser.add_argument("--num_images", type=int, default=5, help="The number of ima
 parser.add_argument("--display_rate", type=int, default=2, help="The epoch_rate of how often to display image segmentations. A display_rate of 3 means that every third epoch, visual segmentations are saved. Default: 3")
 parser.add_argument("--gpus_used", type=int, default=1, help="The number of GPU's to use for training. Only applicable for training with ADE20K. This input argument deprecates the '--num-gpus' argument. Default: 1")
 parser.add_argument("--num_epochs", type=int, default=6, help="The number of epochs to train the model for. Default: 1")
+parser.add_argument("--patience", type=int, default=5, help="The number of epochs to accept that the model hasn't improved before lowering the learning rate by a factor '--lr_gamma'. Default: 5")
+parser.add_argument("--early_stop_patience", type=int, default=15, help="The number of epochs to accept that the model hasn't improved before terminating training. Default: 15")
 parser.add_argument("--learning_rate", type=float, default=7.5e-3, help="The initial learning rate used for training the model. Default 7.5e-3")
+parser.add_argument("--lr_gamma", type=float, default=0.20, help="The update factor for the learning rate when the model performance hasn't improved in 'patience' epochs. Will do new_lr=old_lr*lr_gamma. Default 0.20")
+parser.add_argument("--min_delta", type=float, default=1e-3, help="The minimum improvement the model must have made in order to be accepted as an actual improvement. Default 1e-3")
 parser.add_argument("--crop_enabled", type=str2bool, default=False, help="Whether or not cropping is allowed on the images. Default: False")
 parser.add_argument("--inference_only", type=str2bool, default=False, help="Whether or not training is skipped and only inference is run. This input argument deprecates the '--eval_only' argument. Default: False")
 parser.add_argument("--display_images", type=str2bool, default=False, help="Whether or not some random sample images are displayed before training starts. Default: False")
