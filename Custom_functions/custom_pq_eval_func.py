@@ -117,9 +117,9 @@ def pq_compute_single_image(segm_gt, segm_dt, categories, ignore_label):
 def pq_evaluation(args, config, data_split="train"):
     if data_split == "train": args.dataset_name = config.DATASETS.TRAIN[0]
     elif data_split == "val": args.dataset_name = config.DATASETS.TEST[0]
-    args.json_file = os.path.join(cfg.OUTPUT_DIR, "Predictions", data_split, "sem_seg_predictions.json")
+    args.json_file = os.path.join(config.OUTPUT_DIR, "Predictions", data_split, "sem_seg_predictions.json")
 
-    _root = os.getenv("DETECTRON2_DATASETS", "datasets")
+    _root = os.getenv("DETECTRON2_DATASETS")
     json_file = args.json_file
 
     with open(json_file) as f:
@@ -145,8 +145,9 @@ def pq_evaluation(args, config, data_split="train"):
         categories[i] = {"id": i, "name": class_names[i], "isthing": 0}
 
     pq_stat = PQStat()
-    
-    for image_id in tqdm(image_ids):
+    iteration_counter = 1
+    for image_id in tqdm(image_ids, desc="Image {:d}/{:d}".format(iteration_counter, len(image_ids)), total=len(image_ids), postfix="Compute PQ for every image", leave=True,
+                bar_format="{desc}  | {percentage:3.0f}% | {bar:45}| {n_fmt}/{total_fmt} | [Spent: {elapsed}. Remaining: {remaining}{postfix}]"):
         if args.dataset_name == "ade20k_sem_seg_val":
             gt_dir = os.path.join(_root, "ADEChallengeData2016", "annotations_detectron2", "validation")
             segm_gt = read_image(os.path.join(gt_dir, image_id + ".png")).copy().astype(np.int64)
@@ -156,9 +157,16 @@ def pq_evaluation(args, config, data_split="train"):
         elif args.dataset_name == "ade20k_full_sem_seg_val":
             gt_dir = os.path.join(_root, "ADE20K_2021_17_01", "annotations_detectron2", "validation")
             segm_gt = read_image(os.path.join(gt_dir, image_id + ".tif")).copy().astype(np.int64)
+        elif "vitrolife" in args.dataset_name.lower():
+            gt_dir = os.path.join(_root, "Vitrolife_dataset", "masks")
+            gt_image_file = [x for x in os.listdir(gt_dir) if image_id.lower() in x.lower()]
+            assert len(gt_image_file) == 1, "There should be one and only one mask image file per raw image"
+            gt_image_file = gt_image_file[0]
+            segm_gt = read_image(os.path.join(gt_dir, gt_image_file)).copy().astype(np.int64)
         else:
             raise ValueError(f"Unsupported dataset {args.dataset_name}")
-
+        iteration_counter += 1
+        
         # get predictions
         segm_dt = np.zeros_like(segm_gt)
         anns = imgToAnns[image_id]
@@ -218,3 +226,7 @@ def pq_evaluation(args, config, data_split="train"):
 
     print("")
     print(f"mIoU: {miou}")
+    return results
+
+
+# results = pq_evaluation(args=FLAGS, config=cfg, data_split="train")

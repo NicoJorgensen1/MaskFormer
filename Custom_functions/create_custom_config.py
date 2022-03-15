@@ -65,7 +65,7 @@ def changeConfig_withFLAGS(cfg, FLAGS):
     cfg.DATALOADER.NUM_WORKERS = FLAGS.num_workers                                          # Set the number of workers to only 2
     cfg.INPUT.CROP.ENABLED =  FLAGS.crop_enabled                                            # We will not allow any cropping of the input images
     cfg.MODEL.DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'                       # Assign the device on which the model should run
-    cfg.MODEL.MASK_FORMER.DICE_WEIGHT = 10                                                  # Set the weight for the dice loss
+    cfg.MODEL.MASK_FORMER.DICE_WEIGHT = 7                                                   # Set the weight for the dice loss
     cfg.MODEL.MASK_FORMER.MASK_WEIGHT = 15                                                  # Set the weight for the mask predictive loss
     cfg.MODEL.MASK_FORMER.DROPOUT = float(0.2)                                              # We'll set a dropout probability on 0.2 when training
     cfg.TEST.EVAL_PERIOD = 0                                                                # We won't use the build in evaluation, only the custom evaluation function

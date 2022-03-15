@@ -25,9 +25,9 @@ def evaluateResults(FLAGS, cfg, data_split="train", trainer=My_GoTo_Trainer):
     dataloader = iter(build_detection_train_loader(DatasetCatalog.get(dataset_name),
         mapper=DatasetMapper(cfg, is_train=False), total_batch_size=1, num_workers=1))
 
-    with tqdm(total=dataset_num_files, iterable=None, postfix=None, unit="img", ascii=True, 
-    file=sys.stdout, desc="Image {:d}/{:d}".format(1, dataset_num_files), colour="green", leave=True,
-    bar_format="{desc}{percentage:3.0f}% | {bar:35}| {n_fmt}/{total_fmt} [Spent: {elapsed}. Remaining: {remaining}{postfix}]") as tepoch:     
+    with tqdm(total=dataset_num_files, iterable=None, postfix="Evaluating the {:s} dataset".format(data_split), unit="img",  
+    file=sys.stdout, desc="Image {:d}/{:d}".format(1, dataset_num_files), colour="green", leave=True, ascii=True, 
+    bar_format="{desc}  | {percentage:3.0f}% | {bar:35}| {n_fmt}/{total_fmt} | [Spent: {elapsed}. Remaining: {remaining} | {postfix}]") as tepoch:     
         
         # Predict all the files in the dataset
         for kk, data_batch in enumerate(dataloader):

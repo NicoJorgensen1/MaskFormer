@@ -8,7 +8,7 @@ from visualize_vitrolife_batch import extractNumbersFromString                  
 def early_stopping(history, FLAGS, quit_training=False):
     mode = "min" if "loss" in FLAGS.eval_metric.lower() else "max"                  # Whether a lower value or a higher value is better
     metric_monitored = history[FLAGS.eval_metric][-FLAGS.early_stop_patience+1:]    # Getting the last 'early_stop_patience' values of the 'monitor' metric
-    if len(history[FLAGS.eval_metric]) >= FLAGS.early_stop_patience:                # If we have run for at least FLAGS.early_stop_patience epochs, we'll continue
+    if len(metric_monitored) >= FLAGS.early_stop_patience:                          # If we have run for at least FLAGS.early_stop_patience epochs, we'll continue
         if mode=="max": val_used = np.max(metric_monitored)                         # If we monitor an increasing metric, we want to find the largest value
         if mode=="min": val_used = np.min(metric_monitored)                         # If we monitor a decreasing metric, we want to find the smallest value    
         if mode=="max" and val_used <= metric_monitored[0] + FLAGS.min_delta or mode=="min" and val_used >= metric_monitored[0] - FLAGS.min_delta:  # If the model hasn't improved in the last ...
@@ -20,7 +20,7 @@ def early_stopping(history, FLAGS, quit_training=False):
 def lr_scheduler(cfg, history, FLAGS, learn_rate):
     mode = "min" if "loss" in FLAGS.eval_metric.lower() else "max"                  # Whether a lower value or a higher value is better
     metric_monitored = history[FLAGS.eval_metric][-FLAGS.patience:]                 # Getting the last 'patience' values of the 'monitor' metric
-    if len(history[FLAGS.eval_metric]) >= FLAGS.patience:                           # If we have run for at least FLAGS.patience epochs, we'll continue
+    if len(metric_monitored) >= FLAGS.patience:                                     # If we have run for at least FLAGS.patience epochs, we'll continue
         if mode=="max": val_used = np.max(metric_monitored)                         # If we monitor an increasing metric, we want to find the largest value
         if mode=="min": val_used = np.min(metric_monitored)                         # If we monitor a decreasing metric, we want to find the smallest value    
         if mode=="max" and val_used <= metric_monitored[0] + FLAGS.min_delta or mode=="min" and val_used >= metric_monitored[0] - FLAGS.min_delta:  # If the model hasn't improved in the last 'patience' ...

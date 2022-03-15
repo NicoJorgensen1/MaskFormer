@@ -158,9 +158,7 @@ class My_GoTo_Trainer(DefaultTrainer):
         if comm.is_main_process():
             # Here the default print/log frequency of each writer is used.
             # run writers in the end, so that evaluation metrics are written
-            # ret.append(hooks.PeriodicWriter(self.build_writers(), period=10))
-            # ret.append(hooks.PeriodicWriter(self.build_writers(), period=int(MetadataCatalog[self.cfg.DATASETS.TRAIN[0]].num_files_in_dataset/25)))
-            write_period = int(np.min([20, MetadataCatalog[self.cfg.DATASETS.TRAIN[0]].num_files_in_dataset/25]))
+            write_period = int(np.min([20, MetadataCatalog[self.cfg.DATASETS.TRAIN[0]].num_files_in_dataset/np.min([25, MetadataCatalog[self.cfg.DATASETS.TRAIN[0]].num_files_in_dataset])]))
             ret.append(hooks.PeriodicWriter(self.build_writers(), period=write_period))
         return ret
         

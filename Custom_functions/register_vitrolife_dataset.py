@@ -1,10 +1,12 @@
 import os
 import glob
+from tkinter.tix import Tree
 import pandas as pd
 import numpy as np
 from natsort import natsorted
 from copy import deepcopy
 from PIL import Image
+from tqdm import tqdm
 from detectron2.data import DatasetCatalog, MetadataCatalog
 
 # Define the function to return the list of dictionaries with information regarding all images available in the vitrolife dataset
@@ -19,8 +21,13 @@ def vitrolife_dataset_function(run_mode="train", debugging=False):
 
     # Create the list of dictionaries with information about all images
     img_mask_pair_list = []                                                                 # Initiate the list to store the information about all images
+    total_files = len(os.listdir(os.path.join(vitrolife_dataset_filepath, "raw_images")))
+    iteration_counter = 0
     count = 0                                                                               # Initiate a counter to count the number of images inserted to the dataset
-    for img_filename in os.listdir(os.path.join(vitrolife_dataset_filepath, "raw_images")): # Loop through all files in the raw_images folder
+    for img_filename in tqdm(os.listdir(os.path.join(vitrolife_dataset_filepath, "raw_images")),    # Loop through all files in the raw_images folder
+            total=total_files, unit="img", postfix="Read the Vitrolife {:s} dataset dictionaries".format(run_mode), leave=True,
+            bar_format="{desc}  | {percentage:3.0f}% | {bar:45}| {n_fmt}/{total_fmt} | [Spent: {elapsed}. Remaining: {remaining} | {postfix}]"):  
+        iteration_counter += 1                                                              # Increase the counter that counts the number of iterations in the for-loop
         img_filename_wo_ext = os.path.splitext(os.path.basename(img_filename))[0]           # Get the image filename without .jpg extension
         img_filename_wo_ext_parts = img_filename_wo_ext.split("_")                          # Split the filename where the _ is
         hashkey = img_filename_wo_ext_parts[0]                                              # Extract the hashkey from the filename
@@ -28,7 +35,7 @@ def vitrolife_dataset_function(run_mode="train", debugging=False):
         row = deepcopy(df_data.loc[hashkey,well])                                           # Find the row of the corresponding file in the dataframe
         data_split = row["split"]                                                           # Find the split for the current image, i.e. either train, val or test
         if data_split != run_mode: continue                                                 # If the current image is supposed to be in another split, then continue to the next image
-        mask_filename = glob.glob(os.path.join(vitrolife_dataset_filepath, 'masks',img_filename_wo_ext + '*'))  # Find the corresponding mask filename
+        mask_filename = glob.glob(os.path.join(vitrolife_dataset_filepath, 'masks', img_filename_wo_ext + '*')) # Find the corresponding mask filename
         if len(mask_filename) != 1: continue                                                # Continue only if we find only one mask filename
         mask_filename = os.path.basename(mask_filename[0])                                  # Extract the mask filename from the list
         row["img_file"] = os.path.join(vitrolife_dataset_filepath, "raw_images", img_filename)  # Add the current filename for the input image to the row-variable

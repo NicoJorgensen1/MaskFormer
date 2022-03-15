@@ -6,6 +6,7 @@ import numpy as np
 import matplotlib
 matplotlib.use("pdf")
 from matplotlib import pyplot as plt
+from tqdm import tqdm                                                               # Used to set a progress bar
 from register_vitrolife_dataset import vitrolife_dataset_function                   # Import function to get the dataset_dictionaries of the vitrolife dataset
 from detectron2.data import DatasetCatalog, MetadataCatalog, DatasetMapper, build_detection_train_loader
 from detectron2.engine.defaults import DefaultPredictor
@@ -113,7 +114,12 @@ def visualize_the_images(config, FLAGS, position=[0.55, 0.08, 0.40, 0.75], epoch
     # Get the datasplit and number of images to show
     fig_list, data_batches_final = list(), list()                                   # Initiate the list to store the figures in
     if data_batches==None: data_batches = [None, None, None]                        # If no previous data has been sent, it must be a list of None's...
-    for data_split, data_batch in zip(["train", "val", "test"], data_batches):      # Iterate through the three splits available
+    data_split_count = 1
+    data_split = "train"
+    for data_split, data_batch in tqdm(zip(["train", "val", "test"], data_batches), # Iterate through the three splits available
+            leave=True, unit="Data_split", total=3, ascii=True,  desc="{:s} split {:d}/{:d}".format(data_split, data_split_count, 3),
+            bar_format="{desc}  | {percentage:3.0f}% | {bar:35}| {n_fmt}/{total_fmt} [Spent: {elapsed}. Remaining: {remaining}{postfix}]"):      
+        data_split_count += 1
         if "vitrolife" not in FLAGS.dataset_name.lower() and data_split=="test": continue   # Only vitrolife has a test dataset. ADE20K doesn't. 
         # Extract information about the dataset used
         img_ytrue_ypred, data_batch, FLAGS = create_batch_img_ytrue_ypred(config=config,# Create the batch of images that needs to be visualized

@@ -1,8 +1,6 @@
 # Add the MaskFormer directory to PATH
 import os                                                                           # Used to navigate the folder structure in the current os
-import sys
-
-from matplotlib.pyplot import hist                                                                          # Used to control the PATH variable
+import sys                                                                          # Used to control the PATH variable
 MaskFormer_dir = os.path.join("/mnt", "c", "Users", "Nico-", "Documents", "Python_Projects", "MaskFormer")                                                              # Home WSL
 if not os.path.isdir(MaskFormer_dir): MaskFormer_dir = os.path.join("C:\\", MaskFormer_dir.split(os.path.sep, 1)[1])                                                    # Home windows computer
 if not os.path.isdir(MaskFormer_dir): MaskFormer_dir = os.path.join("/mnt", "c", "Users", "wd974261", "Documents", "Python", "MaskFormer")                              # Work WSL
@@ -27,6 +25,7 @@ os.environ["DETECTRON2_DATASETS"] = dataset_dir
 # Import important libraries
 import shutil
 import numpy as np
+from tqdm import tqdm
 from custom_setup_func import setup_func, zip_output, SaveHistory                   # Assign script to GPU, register vitrolife dataset, create config, zip the output_dir and save the history_dict
 from custom_train_func import launch_custom_training                                # Function to launch the training with the given dataset
 from visualize_vitrolife_batch import putModelWeights, visualize_the_images         # Functions to put model_weights in the config and visualizing the image batch
@@ -43,8 +42,7 @@ FLAGS, cfg = setup_func()
 history = None
 train_dataset = cfg.DATASETS.TRAIN
 val_dataset = cfg.DATASETS.TEST
-base_lr = cfg.SOLVER.BASE_LR
-
+base_lr = FLAGS.learning_rate
 
 # Visualize some random images
 fig_list_before, data_batches, cfg, FLAGS = visualize_the_images(config=cfg, FLAGS=FLAGS)   # Visualize some segmentations on random images before training
@@ -60,6 +58,7 @@ if FLAGS.inference_only == False:
         os.rename(os.path.join(cfg.OUTPUT_DIR, "model_final.pth"),                  # Rename the model that is automatically saved after each epoch ...
             os.path.join(cfg.OUTPUT_DIR, "model_epoch_{:d}.pth".format(epoch+1)))   # ... to model_epoch_x (where x is current epoch number)
         eval_train_results = evaluateResults(FLAGS, cfg, data_split="train", trainer=trainer_class) # Evaluate the result metrics on the training set
+        train_pq_results = pq_evaluation(args=FLAGS, config=cfg, data_split="train")# Evaluate the Panoptic Quality for the training semantic segmentation results
 
         # Validation period. Will 'train' with lr=0 on validation data, correct the metrics files and evaluate performance on validation data
         cfg = putModelWeights(cfg)                                                  # Assign the latest model weights to the config
@@ -71,20 +70,25 @@ if FLAGS.inference_only == False:
         os.remove(os.path.join(cfg.OUTPUT_DIR, "metrics.json"))                     # Remove the original metrics file
         os.remove(os.path.join(cfg.OUTPUT_DIR, "model_final.pth"))                  # Remove the model that will be saved after validation
         eval_val_results = evaluateResults(FLAGS, cfg, data_split="val", trainer=trainer_class) # Evaluate the result metrics on the training set
+        val_pq_results = pq_evaluation(args=FLAGS, config=cfg, data_split="val")    # Evaluate the Panoptic Quality for the validation semantic segmentation results
         
         # Prepare for the training phase of the next epoch. Switch back to training dataset, save history and learning curves and visualize segmentation results
         cfg.DATASETS.TRAIN = train_dataset                                          # Set the 'dataset_train' variable back to the training data
-        history = show_history(config=cfg, FLAGS=FLAGS, metrics_train=eval_train_results["sem_seg"], metrics_eval=eval_val_results["sem_seg"], history=history)  # Create and save learning curves 
+        history = show_history(config=cfg, FLAGS=FLAGS, metrics_train=eval_train_results["sem_seg"],    # Create and save the learning curves ...
+            metrics_eval=eval_val_results["sem_seg"], history=history, pq_train=train_pq_results, pq_val=val_pq_results)    # ... including all training and validation metrics
         SaveHistory(historyObject=history, save_folder=cfg.OUTPUT_DIR)              # Save the history dictionary after each epoch
         if np.mod(np.add(epoch,1), FLAGS.display_rate) == 0:                        # Every 'display_rate' epochs, the model will segment the same images again ...
-            _,data_batches,cfg,FLAGS=visualize_the_images(config=cfg,FLAGS=FLAGS,data_batches=data_batches, epoch_num=epoch+1)  # ... segment and save visualizations
+            _,data_batches,cfg,FLAGS = visualize_the_images(cfg,FLAGS,data_batches, epoch+1)    # ... segment and save visualizations
         
         # Performing callbacks
         cfg = keepAllButLatestAndBestModel(cfg=cfg, history=history, FLAGS=FLAGS)   # Keep only the best and the latest model weights. The rest are deleted.
-        cfg=lr_scheduler(cfg=cfg, history=history, FLAGS=FLAGS, learn_rate=base_lr) # Change the learning rate, if needed
-        base_lr = cfg.SOLVER.BASE_LR                                                # Save a new value for the base_lr variable
-        quit_training = early_stopping(history=history, FLAGS=FLAGS)                # Perform the early stopping callback
-        if quit_training == True: break                                             # If the early stopping callback says we need to quit the training, break the for loop and stop running more epochs
+        if epoch+1 >= FLAGS.patience:                                               # If the model has trained for more than 'patience' epochs ...
+            cfg=lr_scheduler(cfg=cfg, history=history, FLAGS=FLAGS, learn_rate=base_lr) # ... change the learning rate, if needed
+            base_lr = cfg.SOLVER.BASE_LR                                            # Save a new value for the base_lr variable
+        cfg.SOLVER.BASE_LR = base_lr                                                # Assign the base_lr to the config again
+        if epoch+1 >= FLAGS.early_stop_patience:                                    # If the model has trained for more than 'early_stopping_patience' epochs ...
+            quit_training = early_stopping(history=history, FLAGS=FLAGS)            # ... perform the early stopping callback
+            if quit_training == True: break                                         # If the early stopping callback says we need to quit the training, break the for loop and stop running more epochs
 
 
     # Visualize the same images, now with a trained model
@@ -96,10 +100,7 @@ if FLAGS.inference_only == False:
 if FLAGS.debugging == False and "vitrolife" in FLAGS.dataset_name.lower():          # Inference will only be performed if we are not debugging the model and working on the vitrolife dataset
     cfg.DATASETS.TEST = ("vitrolife_dataset_test",)                                 # The inference will be done on the test dataset
     eval_test_results = evaluateResults(FLAGS, cfg, data_split="test")              # Evaluate the result metrics on the validation set with the best performing model
-
-# Evaluate the Panoptic Quality for the semantic segmentation results
-pq_evaluation(args=FLAGS, config=cfg, data_split="train")
-pq_evaluation(args=FLAGS, config=cfg, data_split="val")
+    test_pq_results = pq_evaluation(args=FLAGS, config=cfg, data_split="test")      # Evaluate the Panoptic Quality for the test semantic segmentation results
 
 
 # Zip the resulting output directory
