@@ -43,6 +43,7 @@ history = None
 train_dataset = cfg.DATASETS.TRAIN
 val_dataset = cfg.DATASETS.TEST
 base_lr = FLAGS.learning_rate
+lr_update_check = np.zeros((FLAGS.patience, 1), dtype=bool)                         # Preallocating array to determine whether or not the learning rate was updated
 
 # Visualize some random images
 fig_list_before, data_batches, cfg, FLAGS = visualize_the_images(config=cfg, FLAGS=FLAGS)   # Visualize some segmentations on random images before training
@@ -77,13 +78,14 @@ if FLAGS.inference_only == False:
         history = show_history(config=cfg, FLAGS=FLAGS, metrics_train=eval_train_results["sem_seg"],    # Create and save the learning curves ...
             metrics_eval=eval_val_results["sem_seg"], history=history, pq_train=train_pq_results, pq_val=val_pq_results)    # ... including all training and validation metrics
         SaveHistory(historyObject=history, save_folder=cfg.OUTPUT_DIR)              # Save the history dictionary after each epoch
+        [os.remove(os.path.join(cfg.OUTPUT_DIR, x)) for x in os.listdir(cfg.OUTPUT_DIR) if "events.out.tfevent" in x]
         if np.mod(np.add(epoch,1), FLAGS.display_rate) == 0:                        # Every 'display_rate' epochs, the model will segment the same images again ...
             _,data_batches,cfg,FLAGS = visualize_the_images(cfg,FLAGS,data_batches, epoch+1)    # ... segment and save visualizations
         
         # Performing callbacks
         cfg = keepAllButLatestAndBestModel(cfg=cfg, history=history, FLAGS=FLAGS)   # Keep only the best and the latest model weights. The rest are deleted.
-        if epoch+1 >= FLAGS.patience:                                               # If the model has trained for more than 'patience' epochs ...
-            cfg=lr_scheduler(cfg=cfg, history=history, FLAGS=FLAGS, learn_rate=base_lr) # ... change the learning rate, if needed
+        if epoch+1 >= FLAGS.patience:                                               # If the model has trained for more than 'patience' epochs and we aren't debugging ...
+            cfg, lr_update_check = lr_scheduler(cfg=cfg, history=history, FLAGS=FLAGS, learn_rate=base_lr, lr_updated=lr_update_check)  # ... change the learning rate, if needed
             base_lr = cfg.SOLVER.BASE_LR                                            # Save a new value for the base_lr variable
         cfg.SOLVER.BASE_LR = base_lr                                                # Assign the base_lr to the config again
         if epoch+1 >= FLAGS.early_stop_patience:                                    # If the model has trained for more than 'early_stopping_patience' epochs ...

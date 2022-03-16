@@ -17,15 +17,19 @@ def early_stopping(history, FLAGS, quit_training=False):
 
 
 # Define a function to lower the learning rate
-def lr_scheduler(cfg, history, FLAGS, learn_rate):
-    mode = "min" if "loss" in FLAGS.eval_metric.lower() else "max"                  # Whether a lower value or a higher value is better
+def lr_scheduler(cfg, history, FLAGS, learn_rate, lr_updated):
+    cfg.SOLVER.BASE_LR = learn_rate                                                 # Assign the given learning rate to the config
+    lr_updated[-1] = False                                                          # As we are include the current epoch in the last patience epochs, the final value must be set to False
+    lr_updated = np.roll(a=lr_updated, shift=1)                                     # Shifts all value indices by 1, i.e. a[0:]=a[-1:]
     metric_monitored = history[FLAGS.eval_metric][-FLAGS.patience:]                 # Getting the last 'patience' values of the 'monitor' metric
-    if len(metric_monitored) >= FLAGS.patience:                                     # If we have run for at least FLAGS.patience epochs, we'll continue
+    if not any(lr_updated) and len(metric_monitored) >= FLAGS.patience:             # If no learning rate updates has been made in the last 'patience' epochs...
+        mode = "min" if "loss" in FLAGS.eval_metric.lower() else "max"              # Whether a lower value or a higher value is better
         if mode=="max": val_used = np.max(metric_monitored)                         # If we monitor an increasing metric, we want to find the largest value
         if mode=="min": val_used = np.min(metric_monitored)                         # If we monitor a decreasing metric, we want to find the smallest value    
-        if mode=="max" and val_used <= metric_monitored[0] + FLAGS.min_delta or mode=="min" and val_used >= metric_monitored[0] - FLAGS.min_delta:  # If the model hasn't improved in the last 'patience' ...
-            cfg.SOLVER.BASE_LR = learn_rate * FLAGS.lr_gamma                        # ... epochs the learning rate is lowered
-    return cfg
+        if mode=="max" and val_used <= metric_monitored[0] + FLAGS.min_delta or mode=="min" and val_used >= metric_monitored[0] - FLAGS.min_delta:  # If the model hasn't improved in the ...
+            cfg.SOLVER.BASE_LR = learn_rate * FLAGS.lr_gamma                        # ... last 'patience' epochs the learning rate is lowered
+    lr_updated[0] = False if cfg.SOLVER.BASE_LR == learn_rate else True             # If the learning rate was updated, so is the lr_updated array
+    return cfg, lr_updated
 
 
 # Define a function to delete all models but the 
