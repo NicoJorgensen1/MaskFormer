@@ -56,7 +56,7 @@ def changeConfig_withFLAGS(cfg, FLAGS):
     if FLAGS.use_checkpoint == False: cfg.MODEL.WEIGHTS = ""                                # If the model must be trained without using earlier checkpoints, any earlier checkpoint must be removed...
     cfg.SOLVER.BASE_LR = FLAGS.learning_rate                                                # Starting learning rate
     cfg.SOLVER.IMS_PER_BATCH = FLAGS.batch_size                                             # Batch size used when training => batch_size pr GPU = batch_size // num_gpus
-    cfg.SOLVER.MAX_ITER = FLAGS.epoch_iter                                                  # Number of iterations per epoch  <<< Deprecated explanation: Maximum number of iterations to train for >>>
+    cfg.SOLVER.MAX_ITER = FLAGS.epoch_iter                                                  # <<< Deprecated input argument: Use --num_epochs instead >>>
     cfg.SOLVER.LR_SCHEDULER_NAME = "WarmupMultiStepLR"                                      # Default learning rate scheduler
     cfg.SOLVER.NESTEROV = True                                                              # Whether or not the learning algorithm will use Nesterow momentum
     cfg.SOLVER.WEIGHT_DECAY = float(2e-3)                                                   # A small lambda value for the weight decay
@@ -69,6 +69,7 @@ def changeConfig_withFLAGS(cfg, FLAGS):
     cfg.MODEL.MASK_FORMER.MASK_WEIGHT = 15                                                  # Set the weight for the mask predictive loss
     cfg.MODEL.MASK_FORMER.DROPOUT = float(0.2)                                              # We'll set a dropout probability on 0.2 when training
     cfg.TEST.EVAL_PERIOD = 0                                                                # We won't use the build in evaluation, only the custom evaluation function
+    cfg.SOLVER.CHECKPOINT_PERIOD = FLAGS.epoch_iter                                         # Save a new model checkpoint after each epoch, i.e. after everytime the entire trainining set has been seen by the model
     # cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST = 0.5                                           # Assign the threshold used for the model
     cfg.OUTPUT_DIR = os.path.join(MaskFormer_dir, "output_"+FLAGS.output_dir_postfix)       # Get MaskFormer directory and name the output directory
     config_name = "config_initial.yaml"                                                     # Initial name for the configuration that will be saved in the cfg.OUTPUT_DIR
@@ -81,14 +82,11 @@ def changeConfig_withFLAGS(cfg, FLAGS):
         cfg.INPUT.MAX_SIZE_TEST = FLAGS.img_size_max                                        # The maximum size length for one side of the validation images
         cfg.MODEL.PIXEL_MEAN = [100.15, 102.03, 103.89]                                     # Write the correct image mean value for the entire vitrolife dataset
         cfg.MODEL.PIXEL_STD = [57.32, 59.69, 61.93]                                         # Write the correct image standard deviation value for the entire vitrolife dataset
-        cfg.SOLVER.CHECKPOINT_PERIOD = FLAGS.epoch_iter                                     # Save a new model checkpoint after each epoch, i.e. after everytime the entire trainining set has been seen by the model
-        cfg.SOLVER.STEPS = np.subtract([int(x+1)*np.min([500, 2+FLAGS.epoch_iter]) for x in range(500)],1).tolist() # The iterations where the learning rate will be lowered with a factor of "gamma"
+        cfg.SOLVER.STEPS = [int(FLAGS.epoch_iter*x-1) for x in range(5)]                    # <<< Deprecated input argument: Use --patience instead >>>
         cfg.SOLVER.GAMMA = 0.25                                                             # After every "step" iterations the learning rate will be updated, as new_lr = old_lr*gamma
-        cfg.OUTPUT_DIR = cfg.OUTPUT_DIR.replace("output_", "output_vitrolife_")             # Insert the 'vitrolife' to the output directory, if using the vitrolife dataset
+        cfg.SOLVER.STEPS = np.subtract([int(x+1)*np.min([500, 2+FLAGS.epoch_iter]) for x in range(500)],1).tolist()             # Insert the 'vitrolife' to the output directory, if using the vitrolife dataset
         config_name = "vitrolife_" + config_name                                            # Prepend the config name with "vitrolife"
     if FLAGS.debugging==True:                                                               # If we are debugging the model ...
-        cfg.SOLVER.CHECKPOINT_PERIOD = int(np.subtract(FLAGS.epoch_iter, 1))                # ... a checkpoint will only be saved after each epoch
-        cfg.DATASETS.TEST = cfg.DATASETS.TRAIN                                              # ... and inference will happen on the training set
         cfg.SOLVER.WEIGHT_DECAY = float(0)                                                  # ... we don't want any weight decay
         cfg.MODEL.MASK_FORMER.DROPOUT = float(0)                                            # ... we don't wany any dropout
 

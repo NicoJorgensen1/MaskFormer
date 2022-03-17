@@ -25,7 +25,6 @@ os.environ["DETECTRON2_DATASETS"] = dataset_dir
 # Import important libraries
 import shutil
 import numpy as np
-from tqdm import tqdm
 from custom_setup_func import setup_func, zip_output, SaveHistory                   # Assign script to GPU, register vitrolife dataset, create config, zip the output_dir and save the history_dict
 from custom_train_func import launch_custom_training                                # Function to launch the training with the given dataset
 from visualize_vitrolife_batch import putModelWeights, visualize_the_images         # Functions to put model_weights in the config and visualizing the image batch

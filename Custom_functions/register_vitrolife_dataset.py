@@ -9,6 +9,21 @@ from PIL import Image
 from tqdm import tqdm
 from detectron2.data import DatasetCatalog, MetadataCatalog
 
+
+# Function to select sample dictionaries with unique PN's
+def pickSamplesWithUniquePN(dataset_dict):
+    PNs_found = np.zeros((1,10), dtype=bool)                                                # Create a [1,10] list filled with False values to track if a sample with a specified PN number has been found
+    data_used = []                                                                          # Initiate a new list of dictionaries
+    for data in dataset_dict:                                                               # Iterate over all dictionaries in the list of dictionaries
+        PN = int(data["image_custom_info"]["PN_image"])                                     # Get the number of PN's in the current sample
+        if PNs_found[0,PN] == False:                                                        # If no sample with the current PN_number has been found ...
+            PNs_found[0,PN] = True                                                          # ... the corresponding entry in the PNs_found array are set to true ...
+            data_used.append(data)                                                          # ... and the data_used array is appended with the current sample
+    data_used = sorted(data_used, key=lambda x: x["image_custom_info"]["PN_image"])         # Sort the data_used list by the number of dictionaries
+    return data_used
+
+
+
 # Define the function to return the list of dictionaries with information regarding all images available in the vitrolife dataset
 def vitrolife_dataset_function(run_mode="train", debugging=False):
     # Find the folder containing the vitrolife dataset
@@ -53,11 +68,10 @@ def vitrolife_dataset_function(run_mode="train", debugging=False):
                         "image_custom_info": row}                                           # Add all the info from the current row to the dataset
         img_mask_pair_list.append(current_pair)                                             # Append the dictionary for the current pair to the list of images for the given dataset
         count += 1                                                                          # Increase the sample counter 
-        if count >= 5 and debugging==True: break                                            # When debugging, we will only use 5 samples in both train, val and test
-        # if count >= 36: break
-    
     assert len(img_mask_pair_list) >= 1, print("No image/mask pairs found in {:s} subfolders 'raw_image' and 'masks'".format(vitrolife_dataset_filepath))
-    return natsorted(img_mask_pair_list)                                                    # Sorting the list assures the same 
+    img_mask_pair_list = natsorted(img_mask_pair_list)                                      # Sorting the list assures the same every time this function runs
+    if debugging==True: img_mask_pair_list=pickSamplesWithUniquePN(img_mask_pair_list)      # If we are debugging, we'll only get one sample with each number of PN's 
+    return img_mask_pair_list                                                               # Return the found list of dictionaries
 
 # Function to register the dataset and the meta dataset for each of the three splitshuffleshuffles, [train, val, test]
 def register_vitrolife_data_and_metadata_func(debugging=False):

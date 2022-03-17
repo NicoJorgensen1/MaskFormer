@@ -7,7 +7,7 @@ import matplotlib
 matplotlib.use("pdf")
 from matplotlib import pyplot as plt
 from tqdm import tqdm                                                               # Used to set a progress bar
-from register_vitrolife_dataset import vitrolife_dataset_function                   # Import function to get the dataset_dictionaries of the vitrolife dataset
+from register_vitrolife_dataset import vitrolife_dataset_function
 from detectron2.data import DatasetCatalog, MetadataCatalog, DatasetMapper, build_detection_train_loader
 from detectron2.engine.defaults import DefaultPredictor
 
@@ -77,7 +77,8 @@ def create_batch_img_ytrue_ypred(config, data_split, FLAGS, data_batch=None):
     Softmax_module = nn.Softmax(dim=2)                                              # Create a module to compute the softmax value along the final, channel, dimension of the predicted images
     if data_batch == None:                                                          # If no batch with data was send to the function ...
         if "vitrolife" in FLAGS.dataset_name.lower():                               # ... and if we are using the vitrolife dataset
-            dataset_dicts = vitrolife_dataset_function(data_split, debugging=FLAGS.debugging)   # ... the list of dataset_dicts from vitrolife is computed.
+            dataset_dicts = vitrolife_dataset_function(data_split, debugging=True)  # ... the list of dataset_dicts from vitrolife is computed.
+            dataset_dicts = dataset_dicts[:FLAGS.num_images]
         else: dataset_dicts = DatasetCatalog.get("ade20k_sem_seg_{:s}".format(data_split))  # Else we use the ADE20K dataset
         if len(dataset_dicts) < FLAGS.num_images: FLAGS.num_images = len(dataset_dicts)     # If we are debugging, we'll only return 2 images from vitrolife dataset, thus num_images must be lowered
         dataloader = build_detection_train_loader(dataset_dicts, mapper=DatasetMapper(putModelWeights(config),  # Create a dataloader with the list of dictionaries using the default mapper (maps from filename ...
@@ -102,11 +103,21 @@ def create_batch_img_ytrue_ypred(config, data_split, FLAGS, data_batch=None):
     return img_ytrue_ypred, data_batch, FLAGS
 
 
+# Function to create directories in which the visualization results are saved
 def get_save_dirs(config, dataset_split):
     for data_split in ["train", "val", "test"]:
         if "vitrolife" not in config.DATASETS.TRAIN[0].lower() and data_split=="test": continue     # There are no test dataset for the ade20k
         os.makedirs(os.path.join(config.OUTPUT_DIR, "Visualizations", data_split), exist_ok=True)   # Create a folder to store the segmentations of the images
     return os.path.join(config.OUTPUT_DIR, "Visualizations", dataset_split)                         # Return the folder name of the current dataset split
+
+
+# Function to sort the dictionaries by the number of PN's found
+def sort_dictionary_by_PN(data):
+    PNs_idx = np.argsort(data["PN"])
+    new_data = {}
+    for key in data:
+        new_data[key] = [data[key][x] for x in PNs_idx]
+    return new_data
 
 
 # Define function to plot the images
@@ -117,15 +128,17 @@ def visualize_the_images(config, FLAGS, position=[0.55, 0.08, 0.40, 0.75], epoch
     data_split_count = 1
     data_split = "train"
     for data_split, data_batch in tqdm(zip(["train", "val", "test"], data_batches), # Iterate through the three splits available
-            leave=True, unit="Data_split", total=3, ascii=True,  desc="{:s} split {:d}/{:d}".format(data_split, data_split_count, 3),
+            leave=True, unit="Data_split", total=3, ascii=True,  desc="Dataset split {:d}/{:d}".format(data_split_count, 3),
             bar_format="{desc}  | {percentage:3.0f}% | {bar:35}| {n_fmt}/{total_fmt} [Spent: {elapsed}. Remaining: {remaining}{postfix}]"):      
         data_split_count += 1
         if "vitrolife" not in FLAGS.dataset_name.lower() and data_split=="test": continue   # Only vitrolife has a test dataset. ADE20K doesn't. 
         # Extract information about the dataset used
         img_ytrue_ypred, data_batch, FLAGS = create_batch_img_ytrue_ypred(config=config,# Create the batch of images that needs to be visualized
                 data_split=data_split, FLAGS=FLAGS, data_batch=data_batch)          # And return the images in the data_batch dictionary
+        data_batch = sorted(data_batch, key=lambda x: x["image_custom_info"]["PN_image"])
+        img_ytrue_ypred = sort_dictionary_by_PN(data=img_ytrue_ypred)
         num_rows, num_cols = 3, FLAGS.num_images                                    # The figure will have three rows (input, y_pred, y_true) and one column per image
-        fig = plt.figure(figsize=(int(np.ceil(FLAGS.num_images*4.5)), 8))           # Create the figure object
+        fig = plt.figure(figsize=(int(np.ceil(FLAGS.num_images*5.5)), 9))           # Create the figure object
         row = 0                                                                     # Initiate the row index counter (all manual indexing could have been avoided by having created img_ytrue_ypred as an OrderedDict)
         for key in img_ytrue_ypred.keys():                                          # Loop through all the keys in the batch dictionary
             if key.lower() not in ['input', 'y_true', 'y_pred']: continue           # If the key is not one of (input, y_pred, y_true), we simply skip to the next one
