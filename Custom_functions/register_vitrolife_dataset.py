@@ -83,7 +83,8 @@ def register_vitrolife_data_and_metadata_func(debugging=False):
         MetadataCatalog.get("vitrolife_dataset_{:s}".format(split_mode)).set(stuff_classes=class_labels,
                                                                             stuff_colors = stuff_colors,
                                                                             stuff_dataset_id_to_contiguous_id = stuff_id,
-                                                                            ignore_label=0,                         # The model won't be rewarded for predicting the background pixels
+                                                                            # ignore_label=0,                       # The model won't be rewarded by predicting background pixels
+                                                                            ignore_label=255,                       # No labels will be ignored...
                                                                             evaluator_type="sem_seg",
                                                                             num_files_in_dataset=len(DatasetCatalog["vitrolife_dataset_{:}".format(split_mode)]()))
     assert any(["vitrolife" in x for x in list(MetadataCatalog)]), "Datasets have not been registered correctly"    # Assuring the dataset has been registered correctly

@@ -104,6 +104,7 @@ if FLAGS.debugging == False and "vitrolife" in FLAGS.dataset_name.lower():      
     test_pq_results = pq_evaluation(args=FLAGS, config=cfg, data_split="test")      # Evaluate the Panoptic Quality for the test semantic segmentation results
 
 
-# Zip the resulting output directory
+# Remove all metrics.json files and zip the resulting output directory
+[os.remove(os.path.join(cfg.OUTPUT_DIR, x)) for x in os.listdir(cfg.OUTPUT_DIR) if "metrics" in x.lower() and x.endswith(".json")]
 zip_output(cfg)
 

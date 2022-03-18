@@ -50,12 +50,13 @@ def replaceClassNamesForClassIndicesFunc(history_dict, config):
     new_history = {}
     class_names = MetadataCatalog[config.DATASETS.TRAIN[0]].stuff_classes                               # Get the class names for the dataset
     class_indices = list(MetadataCatalog[config.DATASETS.TRAIN[0]].stuff_dataset_id_to_contiguous_id.keys())    # Get the class indices for the dataset
-    lbl_to_ignore = MetadataCatalog[config.DATASETS.TRAIN[0]].ignore_label                              # Get the label to ignore for the dataset
+    lbl_to_ignore = MetadataCatalog[config.DATASETS.TRAIN[0]].ignore_label                              # Get the label to ignore for the dataset. Label values can be either a class label or outside-range (i.e. no labels ignored)
     for key in history_dict:                                                                            # Iterate over all keys in the dictionary
         new_key = key                                                                                   # First, assign the current key to the 'new_key'
         key_in_classnames = [x.lower() in key.lower() for x in class_names]                             # Get a list of boolean values telling if any key_name match a class_name
         if any(key_in_classnames):                                                                      # If any of the key_names in history_dict matches a class_name ...
-            if key_in_classnames[lbl_to_ignore]: continue                                               # ... and that class_name is the one to ignore, we'll simply skip it
+            if lbl_to_ignore <= len(key_in_classnames):                                                 # ... and if the label_ignore is set to be an actual class label ...
+                if key_in_classnames[lbl_to_ignore]: continue                                           # ... and that class_name is the one to ignore, we'll simply skip it
             class_name = np.asarray(class_names)[key_in_classnames].item().lower()                      # Read the class_name that is in the current key
             class_idx = np.asarray(class_indices)[key_in_classnames].item()                             # Read the class idx for the corresponding clas name
             new_key = key.lower().replace(class_name, "C{:d}".format(class_idx)).replace("-", "_")      # Replace the class name with the C{idx} and replace '-' with '_'
