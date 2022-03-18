@@ -8,6 +8,36 @@ from detectron2.engine.defaults import DefaultPredictor
 from custom_goto_trainer_class import My_GoTo_Trainer
 from tqdm import tqdm
 
+
+from detectron2.utils.file_io import PathManager
+import numpy as np
+from PIL import Image
+
+# Create a custom 'process' function, where the mask GT image, that is send with the input dictionary is actually used...
+class My_Evaluator(SemSegEvaluator):
+    def process(self, inputs, outputs, gts):
+        """
+        Args:
+            inputs: the inputs to a model.
+                It is a list of dicts. Each dict corresponds to an image and
+                contains keys like "height", "width", "file_name".
+            outputs: the outputs of a model. It is either list of semantic segmentation predictions
+                (Tensor [H, W]) or list of dicts with key "sem_seg" that contains semantic
+                segmentation prediction in the same format.
+        """
+        for input, output, gt in zip(inputs, outputs, gts):
+            output = output["sem_seg"].argmax(dim=0).to(self._cpu_device)
+            pred = np.array(output, dtype=np.int)
+            gt = np.asarray(gt.numpy()).astype(np.uint8)
+            gt[gt == self._ignore_label] = self._num_classes
+            self._conf_matrix += np.bincount(
+                (self._num_classes + 1) * pred.reshape(-1) + gt.reshape(-1),
+                minlength=self._conf_matrix.size,
+            ).reshape(self._conf_matrix.shape)
+            self._predictions.extend(self.encode_json_sem_seg(pred, input["file_name"]))
+
+
+# Define the evaluation function
 def evaluateResults(FLAGS, cfg, data_split="train", trainer=My_GoTo_Trainer):
     # Get the correct properties
     dataset_name = cfg.DATASETS.TRAIN[0] if "train" in data_split.lower() else cfg.DATASETS.TEST[0]         # Get the name of the dataset that will be evaluated
@@ -17,7 +47,7 @@ def evaluateResults(FLAGS, cfg, data_split="train", trainer=My_GoTo_Trainer):
 
     # Create the predictor and evaluator instances
     predictor = DefaultPredictor(cfg=cfg)
-    evaluator = SemSegEvaluator(dataset_name=dataset_name, output_dir=pred_out_dir)
+    evaluator = My_Evaluator(dataset_name=dataset_name, output_dir=pred_out_dir)
     evaluator.reset()
     model = trainer.build_model(cfg)
 
@@ -37,7 +67,7 @@ def evaluateResults(FLAGS, cfg, data_split="train", trainer=My_GoTo_Trainer):
                 gt_mask.append(data["sem_seg"])
                 out_pred = predictor.__call__(img)
                 outputs.append(out_pred)
-            evaluator.process(data_batch, outputs)
+            evaluator.process(data_batch, outputs, gt_mask)
             tepoch.desc = "Image {:d}/{:d} ".format(kk+1, dataset_num_files)
             tepoch.update(1)
             if kk+1 >= dataset_num_files:

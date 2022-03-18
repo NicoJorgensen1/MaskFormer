@@ -134,11 +134,12 @@ def visualize_the_images(config, FLAGS, position=[0.55, 0.08, 0.40, 0.75], epoch
         if "vitrolife" not in FLAGS.dataset_name.lower() and data_split=="test": continue   # Only vitrolife has a test dataset. ADE20K doesn't. 
         # Extract information about the dataset used
         img_ytrue_ypred, data_batch, FLAGS = create_batch_img_ytrue_ypred(config=config,# Create the batch of images that needs to be visualized
-                data_split=data_split, FLAGS=FLAGS, data_batch=data_batch)          # And return the images in the data_batch dictionary
-        data_batch = sorted(data_batch, key=lambda x: x["image_custom_info"]["PN_image"])
-        img_ytrue_ypred = sort_dictionary_by_PN(data=img_ytrue_ypred)
+                data_split=data_split, FLAGS=FLAGS, data_batch=data_batch)              # And return the images in the data_batch dictionary
+        if "vitrolife" in FLAGS.dataset_name.lower():                               # If we are working on the vitrolife dataset sort the ...
+            data_batch = sorted(data_batch, key=lambda x: x["image_custom_info"]["PN_image"])   # ... data_batch after the number of PN per found image
+            img_ytrue_ypred = sort_dictionary_by_PN(data=img_ytrue_ypred)           # And then also sort the data dictionary
         num_rows, num_cols = 3, FLAGS.num_images                                    # The figure will have three rows (input, y_pred, y_true) and one column per image
-        fig = plt.figure(figsize=(int(np.ceil(FLAGS.num_images*5.5)), 9))           # Create the figure object
+        fig = plt.figure(figsize=(int(np.ceil(FLAGS.num_images*5.5)), 10))          # Create the figure object
         row = 0                                                                     # Initiate the row index counter (all manual indexing could have been avoided by having created img_ytrue_ypred as an OrderedDict)
         for key in img_ytrue_ypred.keys():                                          # Loop through all the keys in the batch dictionary
             if key.lower() not in ['input', 'y_true', 'y_pred']: continue           # If the key is not one of (input, y_pred, y_true), we simply skip to the next one

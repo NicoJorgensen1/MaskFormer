@@ -148,6 +148,9 @@ def pq_evaluation(args, config, data_split="train"):
     iteration_counter = 1
     for image_id in tqdm(image_ids, desc="Image {:d}/{:d}".format(iteration_counter, len(image_ids)), total=len(image_ids), postfix="Compute PQ for every image", leave=True,
                 bar_format="{desc}  | {percentage:3.0f}% | {bar:45}| {n_fmt}/{total_fmt} | [Spent: {elapsed}. Remaining: {remaining}{postfix}]"):
+        if args.dataset_name == "ade20k_sem_seg_train":
+            gt_dir = os.path.join(_root, "ADEChallengeData2016", "annotations_detectron2", "training")
+            segm_gt = read_image(os.path.join(gt_dir, image_id + ".png")).copy().astype(np.int64)
         if args.dataset_name == "ade20k_sem_seg_val":
             gt_dir = os.path.join(_root, "ADEChallengeData2016", "annotations_detectron2", "validation")
             segm_gt = read_image(os.path.join(gt_dir, image_id + ".png")).copy().astype(np.int64)
