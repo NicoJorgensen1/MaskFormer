@@ -2,16 +2,13 @@
 import sys
 import os
 import torch
+import numpy as np
 from detectron2.data import DatasetCatalog, DatasetMapper, build_detection_train_loader
 from detectron2.evaluation import SemSegEvaluator
 from detectron2.engine.defaults import DefaultPredictor
 from custom_goto_trainer_class import My_GoTo_Trainer
 from tqdm import tqdm
 
-
-from detectron2.utils.file_io import PathManager
-import numpy as np
-from PIL import Image
 
 # Create a custom 'process' function, where the mask GT image, that is send with the input dictionary is actually used...
 class My_Evaluator(SemSegEvaluator):
@@ -38,22 +35,24 @@ class My_Evaluator(SemSegEvaluator):
 
 
 # Define the evaluation function
-def evaluateResults(FLAGS, cfg, data_split="train", trainer=My_GoTo_Trainer):
+def evaluateResults(FLAGS, cfg, data_split="train",  dataloader=None, evaluator=None):
     # Get the correct properties
     dataset_name = cfg.DATASETS.TRAIN[0] if "train" in data_split.lower() else cfg.DATASETS.TEST[0]         # Get the name of the dataset that will be evaluated
     dataset_num_files = FLAGS.num_train_files if "train" in data_split.lower() else FLAGS.num_val_files     # Get the number of files 
     pred_out_dir = os.path.join(cfg.OUTPUT_DIR, "Predictions", data_split)                                  # The path of where to store the resulting evaluation
     os.makedirs(pred_out_dir, exist_ok=True)                                                                # Create the evaluation folder, if it doesn't already exist
 
+    # Build the dataloader if no dataloader has been sent to the function as an input
+    if dataloader == None:
+        dataloader = iter(build_detection_train_loader(DatasetCatalog.get(dataset_name),
+            mapper=DatasetMapper(cfg, is_train=False), total_batch_size=1, num_workers=1))
+    
     # Create the predictor and evaluator instances
     predictor = DefaultPredictor(cfg=cfg)
-    evaluator = My_Evaluator(dataset_name=dataset_name, output_dir=pred_out_dir)
+    if evaluator == None:
+        evaluator = My_Evaluator(dataset_name=dataset_name, output_dir=pred_out_dir)
     evaluator.reset()
-    model = trainer.build_model(cfg)
 
-    # Build the dataloader.
-    dataloader = iter(build_detection_train_loader(DatasetCatalog.get(dataset_name),
-        mapper=DatasetMapper(cfg, is_train=False), total_batch_size=1, num_workers=1))
 
     with tqdm(total=dataset_num_files, iterable=None, postfix="Evaluating the {:s} dataset".format(data_split), unit="img",  
     file=sys.stdout, desc="Image {:d}/{:d}".format(1, dataset_num_files), colour="green", leave=True, ascii=True, 
@@ -77,4 +76,4 @@ def evaluateResults(FLAGS, cfg, data_split="train", trainer=My_GoTo_Trainer):
     eval_metrics_results = evaluator.evaluate()
 
     # Return the results
-    return eval_metrics_results
+    return eval_metrics_results, dataloader, evaluator

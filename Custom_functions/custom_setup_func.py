@@ -10,13 +10,10 @@ from detectron2.engine import default_argument_parser                       # De
 from GPU_memory_ranked_assigning import assign_free_gpus                    # Function to assign the script to a given number of GPUs
 from register_vitrolife_dataset import register_vitrolife_data_and_metadata_func        # Register the vitrolife dataset and metadata in the Detectron2 dataset catalog
 from create_custom_config import createVitrolifeConfiguration, changeConfig_withFLAGS   # Function to create a configuration used for training 
-from detectron2.modeling import build_model
-
-# model = build_model(cfg=cfg)
 
 
 # Define function to log information about the dataset
-def printAndLog(input_to_write, logs, print_str=True, write_input_to_log=True, prefix="\n", postfix="", oneline=True):
+def printAndLog(input_to_write, logs, print_str=True, write_input_to_log=True, prefix="\n", postfix="", oneline=True, length=None):
     mode = "a" if os.path.isfile(logs) else "w"                             # Whether or not we are appending to the logfile or creating a new logfile
     logs = open(file=logs, mode=mode)                                       # Open the logfile, i.e. making it writable
     
@@ -33,10 +30,15 @@ def printAndLog(input_to_write, logs, print_str=True, write_input_to_log=True, p
     if isinstance(input_to_write, dict):                                    # If the input is a dictionary ...
         if write_input_to_log: logs.writelines("{:s}".format(prefix))       # ... and the input must be logged, the prefix is written ...
         if write_input_to_log or print_str:                                 # ... or if the input has to be either logged or printed ...
-            for key in input_to_write.keys():                               # ... and then we loop over all key-value pairs in the dictionary ...
-                string = "{:<25}{:s} ".format(key+":" + "{}".format(input_to_write[key], "\n" if oneline else "||"))    # ... to create a string of the current key-value pair ...
-                if write_input_to_log: logs.writelines(string)              # ... to log the pair on the same line ...
-                if print_str: print(string, end="\t" if oneline else "\n")  # ... and print it if chosen ...
+            for key, val in input_to_write.items():                         # ... and then we loop over all key-value pairs in the dictionary ...
+                if isinstance(val, float): val = "{:.4f}".format(val)       # If the value is a float value, round it to four decimals
+                else: val = str(val)                                        # Else, simply convert the value to a string
+                if val == "": val = "None"                                  # If the value is empty, let it be "None"
+                key = key + ": "                                            # Add the colon to the key
+                if length != None: key = key.ljust(length)                  # If any length has been chosen by the user, pad the key-name string to that specific length
+                string = "{:s}{:s}{:s}".format(key, val.ljust(11), "||\t" if oneline else "\n") # Create the string to print and log
+                if write_input_to_log: logs.writelines(string)              # ... If the string needs to be logged, log the key-value pairs on the same line ...
+                if print_str: print(string, end="\t" if oneline else "")    # ... and print it if chosen ...
         if write_input_to_log: logs.writelines("{:s}".format(postfix))      # ... before writing the postfix 
     
     # Close the logfile again
@@ -50,7 +52,7 @@ def rename_output_inference_folder(config):                                 # De
     os.rename(source_folder, dest_folder)                                   # Perform the renaming of the folder
 
 def zip_output(cfg):
-    print("Zipping the output directory {:s} with {:.0f} files".format(os.path.basename(cfg.OUTPUT_DIR), len(os.listdir(cfg.OUTPUT_DIR))))
+    print("\nZipping the output directory {:s} with {:.0f} files".format(os.path.basename(cfg.OUTPUT_DIR), len(os.listdir(cfg.OUTPUT_DIR))))
     make_archive(base_name=os.path.basename(cfg.OUTPUT_DIR), format="zip",  # Instantiate the zipping of the output directory  where the resulting zip file will ...
         root_dir=os.path.dirname(cfg.OUTPUT_DIR), base_dir=os.path.basename(cfg.OUTPUT_DIR))    # ... include the output folder (not just the files from the folder)
 
@@ -71,6 +73,16 @@ def changeFLAGS(FLAGS):
     if FLAGS.debugging: FLAGS.eval_metric.replace("val", "train")           # The metric used for evaluation will be a training metric, if we are debugging the model
     return FLAGS
 
+# Define a function to extract the final results that will be printed in the log file
+def getBestEpochResults(history, best_epoch):
+    val_to_keep = {}
+    final_epoch_idx = np.max(np.argwhere(history["val_epoch_num"]==best_epoch))
+    keys_to_use = sorted([x for x in history.keys() if all(["val" in x, x[-2]!="_"]) and any([y in x for y in ["SQ", "RQ", "PQ", "IoU", "ACC", "loss"]])], key=str.lower)
+    for key in keys_to_use:
+        if "loss" in key: val_to_keep[key] = history[key][final_epoch_idx]
+        if "loss" not in key: val_to_keep[key] = history[key][best_epoch-1]
+    return val_to_keep
+
 # Save history dictionary
 def SaveHistory(historyObject, save_folder, historyName="history"):         # Function to save the dict history in the specified folder 
     hist_file = open(os.path.join(save_folder, historyName+".pkl"), "wb")   # Opens a pickle for saving the history dictionary 
@@ -83,7 +95,7 @@ parser = default_argument_parser()
 start_time = datetime.now().strftime("%H_%M_%d%b%Y").upper()
 parser.add_argument("--dataset_name", type=str, default="vitrolife", help="Which datasets to train on. Choose between [ADE20K, Vitrolife]. Default: Vitrolife")
 parser.add_argument("--output_dir_postfix", type=str, default=start_time, help="Filename extension to add to the output directory of the current process. Default: now: 'HH_MM_DDMMMYYYY'")
-parser.add_argument("--eval_metric", type=str, default="val_mIoU", help="Metric to use in order to determine the 'best' model weights. Available: val_/train_ prefix to [total_loss, mIoU, fIoU, mACC]. Default: val_mIoU")
+parser.add_argument("--eval_metric", type=str, default="val_fwIoU", help="Metric to use in order to determine the 'best' model weights. Available: val_/train_ prefix to [total_loss, mIoU, fwIoU, mACC, PQ, RQ, SQ]. Default: val_fwIoU")
 parser.add_argument("--num_workers", type=int, default=1, help="Number of workers to use for training the model. Default: 1")
 parser.add_argument("--max_iter", type=int, default=int(3e1), help="Maximum number of iterations to train the model for. <<Deprecated argument. Use 'num_epochs' instead>>. Default: 100")
 parser.add_argument("--img_size_min", type=int, default=500, help="The length of the smallest size of the training images. Default: 500")
@@ -93,19 +105,19 @@ parser.add_argument("--batch_size", type=int, default=1, help="The batch size us
 parser.add_argument("--num_images", type=int, default=6, help="The number of images to display/segment. Default: 6")
 parser.add_argument("--display_rate", type=int, default=3, help="The epoch_rate of how often to display image segmentations. A display_rate of 3 means that every third epoch, visual segmentations are saved. Default: 3")
 parser.add_argument("--gpus_used", type=int, default=1, help="The number of GPU's to use for training. Only applicable for training with ADE20K. This input argument deprecates the '--num-gpus' argument. Default: 1")
-parser.add_argument("--num_epochs", type=int, default=1, help="The number of epochs to train the model for. Default: 3")
+parser.add_argument("--num_epochs", type=int, default=2, help="The number of epochs to train the model for. Default: 3")
 parser.add_argument("--patience", type=int, default=5, help="The number of epochs to accept that the model hasn't improved before lowering the learning rate by a factor '--lr_gamma'. Default: 5")
 parser.add_argument("--early_stop_patience", type=int, default=20, help="The number of epochs to accept that the model hasn't improved before terminating training. Default: 15")
 parser.add_argument("--learning_rate", type=float, default=7.5e-3, help="The initial learning rate used for training the model. Default 7.5e-3")
 parser.add_argument("--lr_gamma", type=float, default=0.20, help="The update factor for the learning rate when the model performance hasn't improved in 'patience' epochs. Will do new_lr=old_lr*lr_gamma. Default 0.20")
 parser.add_argument("--min_delta", type=float, default=1e-3, help="The minimum improvement the model must have made in order to be accepted as an actual improvement. Default 1e-3")
-parser.add_argument("--crop_enabled", type=str2bool, default=False, help="Whether or not cropping is allowed on the images. Default: False")
+parser.add_argument("--crop_enabled", type=str2bool, default=True, help="Whether or not cropping is allowed on the images. Default: False")
 parser.add_argument("--inference_only", type=str2bool, default=False, help="Whether or not training is skipped and only inference is run. This input argument deprecates the '--eval_only' argument. Default: False")
 parser.add_argument("--display_images", type=str2bool, default=False, help="Whether or not some random sample images are displayed before training starts. Default: False")
 parser.add_argument("--use_checkpoint", type=str2bool, default=False, help="Whether or not we are loading weights from a model checkpoint file before training. Only applicable when using ADE20K dataset. Default: False")
 parser.add_argument("--use_transformer_backbone", type=str2bool, default=False, help="Whether or now we are using the extended swin_small_transformer backbone. Only applicable if '--use_per_pixel_baseline'=False. Default: False")
 parser.add_argument("--use_per_pixel_baseline", type=str2bool, default=False, help="Whether or now we are using the per_pixel_calculating head. Alternative is the MaskFormer (or transformer) heads. Default: False")
-parser.add_argument("--debugging", type=str2bool, default=True, help="Whether or not we are debugging the script. Default: False")
+parser.add_argument("--debugging", type=str2bool, default=False, help="Whether or not we are debugging the script. Default: False")
 # Parse the arguments into a Namespace variable
 FLAGS = parser.parse_args()
 FLAGS = changeFLAGS(FLAGS)
@@ -135,8 +147,9 @@ if os.path.exists(log_file): os.remove(log_file)
 
 # Initiate the log file
 start_time_readable = "{:s}:{:s} {:s}-{:s}-{:s}".format(start_time[:2], start_time[3:5], start_time[6:8], start_time[8:11], start_time[11:])
-printAndLog(input_to_write="Training initiated at {:s}".format(start_time_readable).upper(), logs=log_file, prefix="")
-printAndLog(input_to_write=vars(FLAGS), logs=log_file, oneline=False)
+printAndLog(input_to_write="Training initiated at {:s}".format(start_time_readable).upper(), logs=log_file, prefix="", postfix="\n")
+printAndLog(input_to_write="FLAGS input arguments:", logs=log_file)
+printAndLog(input_to_write=vars(FLAGS), logs=log_file, oneline=False, length=27)
 
 # Return the values again
 def setup_func(): return FLAGS, cfg, log_file

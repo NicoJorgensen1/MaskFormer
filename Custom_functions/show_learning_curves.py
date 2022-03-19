@@ -4,6 +4,7 @@ import json                                                                     
 import numpy as np                                                                                      # Used for division and floor/ceil operations here
 import matplotlib.pyplot as plt                                                                         # The plotting package
 from natsort import natsorted                                                                           # Function to natural sort a list or array 
+from copy import deepcopy                                                                               # Used to make a copy of the key-name before replacing class name with class idx
 from visualize_vitrolife_batch import extractNumbersFromString                                          # Function to extract numbers from a string
 from detectron2.data import MetadataCatalog                                                             # Catalogs for metadata for registered datasets
 
@@ -44,26 +45,16 @@ def load_json_metrics(config, data_split="train"):
 # metrics = load_json_metrics(config=config)
 
 
-# Create a function to replace key_names in the history dictionary, i.e. replace class_names with the class-indices
-def replaceClassNamesForClassIndicesFunc(history_dict, config):
-    new_history = {}
+# Create a function to replace the class_name in a string with the corresponding class_idx
+def changeClassNameForClassIdxFunc(key, config):
     class_names = MetadataCatalog[config.DATASETS.TRAIN[0]].stuff_classes                               # Get the class names for the dataset
     class_indices = list(MetadataCatalog[config.DATASETS.TRAIN[0]].stuff_dataset_id_to_contiguous_id.keys())    # Get the class indices for the dataset
-    lbl_to_ignore = MetadataCatalog[config.DATASETS.TRAIN[0]].ignore_label                              # Get the label to ignore for the dataset. Label values can be either a class label or outside-range (i.e. no labels ignored)
-    for key in history_dict:                                                                            # Iterate over all keys in the dictionary
-        new_key = key                                                                                   # First, assign the current key to the 'new_key'
-        key_in_classnames = [x.lower() in key.lower() for x in class_names]                             # Get a list of boolean values telling if any key_name match a class_name
-        if any(key_in_classnames):                                                                      # If any of the key_names in history_dict matches a class_name ...
-            if lbl_to_ignore <= len(key_in_classnames):                                                 # ... and if the label_ignore is set to be an actual class label ...
-                if key_in_classnames[lbl_to_ignore]: continue                                           # ... and that class_name is the one to ignore, we'll simply skip it
-            class_name = np.asarray(class_names)[key_in_classnames].item().lower()                      # Read the class_name that is in the current key
-            class_idx = np.asarray(class_indices)[key_in_classnames].item()                             # Read the class idx for the corresponding clas name
-            new_key = key.lower().replace(class_name, "C{:d}".format(class_idx)).replace("-", "_")      # Replace the class name with the C{idx} and replace '-' with '_'
-        new_key = new_key.replace("acc", "ACC").replace("iou", "IoU")                                   # Replace 'acc' with ACC, if present, and replace 'iou' with 'IoU' if present
-        new_key = new_key.replace("pq", "PQ").replace("sq", "SQ").replace("rq", "RQ")                   # Make PQ, SQ, RQ keys upper case keys
-        if "C{:d}".format(lbl_to_ignore) in key: continue                                               # If the label class that we need to ignore is in the key, then skip that one...
-        new_history[new_key] = history_dict[key]                                                        # Give the new dictionary the new key-name and assign to it the data from the old dictionary
-    return new_history                                                                                  # Return the new dictionary
+    for class_name, class_lbl in zip(class_names, class_indices):                                       # Iterate over all the class names and the corresponding class labels
+        if class_name.lower() in key.lower():                                                           # If the class name is in the key name ...
+            key = key.lower().replace(class_name.lower(), "C{:d}".format(class_lbl))                    # ... the class_name part is replaced with the corresponding class label
+            key = key.replace("-", "_").replace("acc", "ACC").replace("iou", "IoU").replace("-", "_")   # ... and we make sure the key is written in proper format
+            break                                                                                       # ... and we stop iterating over the rest of the class_names
+    return key                                                                                          # Return the new key name
 
 
 # Create a function to extract the list of lists containing the keys that are relevant to show
@@ -87,35 +78,31 @@ def extractRelevantHistoryKeys(history):
 
 
 # Create a function to create the history dictionary
-def combineDataToHistoryDictionaryFunc(config, metrics_train, metrics_eval, pq_train, pq_val, history=None):
-    train_history = load_json_metrics(config=config, data_split="train")                                # Load the metrics into the history dictionary
-    val_history = load_json_metrics(config=config, data_split="val")                                    # Load the metrics into the history dictionary
+def combineDataToHistoryDictionaryFunc(config, eval_metrics=None, pq_metrics=None, data_split="train", history=None, json_metrics=None):
     if history == None: history = {}                                                                    # Initiate the history dictionary that will be used
-    for key in train_history: history["train_"+key] = train_history[key]                                # Give all training loss metrics the prefix "train"
-    for key in val_history: history["val_"+key] = val_history[key]                                      # Give all validation loss metrics the prefix "val"
-    for key in metrics_train.keys():                                                                    # Iterate over all keys in the history
-        if "train_"+key not in history: history["train_"+key] = list()                                  # If the given key doesn't exist add the key with ...
-        if "val_"+key not in history: history["val_"+key] = list()                                      # ... the data_split mode prefix as an empty list
-        history["train_"+key].append(metrics_train[key])                                                # Append the current key-value from the metrics_train
-        history["val_"+key].append(metrics_eval[key])                                                   # Append the current key-value from the metrics_val
-    for master_key in pq_train.keys():                                                                  # Iterate over all keys in the PQ results ...
-        if "all" in master_key.lower():                                                                 # Available master_keys are ['All', 'per_class', 'Stuff']. All and Stuff are identical (at least AFAIK)
-            for key in pq_train[master_key].keys():                                                     # ... each element in the PQ_results is a new dictionary
-                if "n" in key.lower(): continue                                                         # If the key in the new dictionary is just the 'n' (number of classes), then skip that one
-                if "train_"+key not in history: history["train_"+key] = list()                          # If the given key doesn't exist add the key with ...
-                if "val_"+key not in history: history["val_"+key] = list()                              # ... the data_split mode prefix as an empty list
-                history["train_"+key].append(pq_train[master_key][key]*100)                             # Append the current key-value from the metrics_train
-                history["val_"+key].append(pq_val[master_key][key]*100)                                 # Append the current key-value from the metrics_val
-        if "per_class" in master_key.lower():                                                           # If we are looking at the per_class panoptic scores ...
-            for class_key in pq_train[master_key].keys():                                               # ... we'll iterate over all classes
-                for key in pq_train[master_key][class_key]:                                             # Loop through all the class_variables of PQ, SQ, RQ
-                    if "train_{:s}_C{:d}".format(key, class_key) not in history: history["train_{:s}_C{:d}".format(key, class_key)] = list()
-                    if "val_{:s}_C{:d}".format(key, class_key) not in history: history["val_{:s}_C{:d}".format(key, class_key)] = list()
-                    history["train_{:s}_C{:d}".format(key, class_key)].append(pq_train[master_key][class_key][key])
-                    history["val_{:s}_C{:d}".format(key, class_key)].append(pq_val[master_key][class_key][key])
-    history = replaceClassNamesForClassIndicesFunc(history_dict=history, config=config)                 # Replace history dictionary names
-    hist_keys = extractRelevantHistoryKeys(history)
-    return history, hist_keys
+    if "train" in data_split: json_metrics = load_json_metrics(config=config, data_split="train")       # Load the metrics into the history dictionary
+    if "val" in data_split: json_metrics = load_json_metrics(config=config, data_split="val")           # Load the metrics into the history dictionary
+    if json_metrics != None:                                                                            # If the json metrics has been loaded ...
+        for key in json_metrics: history[data_split+"_"+key] = json_metrics[key]                        # ... append all the metrics losses to the dictionary with the split prefix on the key
+    if eval_metrics != None:                                                                            # If any evaluation metrics are available
+        for key in eval_metrics.keys():                                                                 # Iterate over all keys in the history
+            old_key = deepcopy(key)                                                                     # Make a copy now of the original key name from the metrics_train/eval dictionary
+            key = changeClassNameForClassIdxFunc(key=key, config=config)                                # Exchange class_name with class_label in the key-name
+            if data_split+"_"+key not in history: history[data_split+"_"+key] = list()                  # If the given key doesn't exist add the key with ...
+            history[data_split+"_"+key].append(eval_metrics[old_key])                                   # Append the current key-value from the metrics_train
+    if pq_metrics != None:                                                                              # If any panoptic quality metrics are available ...
+        for master_key in pq_metrics.keys():                                                            # Iterate over all keys in the PQ results ...
+            if "all" in master_key.lower():                                                             # Available master_keys are ['All', 'per_class', 'Stuff']. All and Stuff are identical (at least AFAIK)
+                for key in pq_metrics[master_key].keys():                                               # ... each element in the PQ_results is a new dictionary
+                    if "n" in key.lower(): continue                                                     # If the key in the new dictionary is just the 'n' (number of classes), then skip that one
+                    if data_split+"_"+key.upper() not in history: history[data_split+"_"+key.upper()] = list()  # If the given key doesn't exist add the key with ...
+                    history[data_split+"_"+key.upper()].append(pq_metrics[master_key][key]*100)         # Append the current key-value from the metrics_train
+            if "per_class" in master_key.lower():                                                       # If we are looking at the per_class panoptic scores ...
+                for class_key in pq_metrics[master_key].keys():                                         # ... we'll iterate over all classes
+                    for key in pq_metrics[master_key][class_key]:                                       # Loop through all the class_variables of PQ, SQ, RQ
+                        if data_split+"_{:s}_C{:d}".format(key.upper(), class_key) not in history: history[data_split+"_{:s}_C{:d}".format(key.upper(), class_key)] = list()
+                        history[data_split+"_{:s}_C{:d}".format(key.upper(), class_key)].append(pq_metrics[master_key][class_key][key]*100)
+    return history
 
 
 # Function to display learning curves
@@ -127,8 +114,9 @@ def show_history(config, FLAGS, metrics_train, metrics_eval, pq_train, pq_val, h
     Pixel Accuracy (pACC)
     """
     # Create history and list of relevant history keys
-    history, hist_keys = combineDataToHistoryDictionaryFunc(config=config, metrics_train=metrics_train, # Create the history dictionary ...
-            metrics_eval=metrics_eval, pq_train=pq_train, pq_val=pq_val, history=history)               # ... and the list of important keys
+    history = combineDataToHistoryDictionaryFunc(config=config, eval_metrics=metrics_train, pq_metrics=pq_train, data_split="train", history=history)
+    history = combineDataToHistoryDictionaryFunc(config=config, eval_metrics=metrics_eval, pq_metrics=pq_val, data_split="val", history=history)
+    hist_keys = extractRelevantHistoryKeys(history)
     ax_titles = ["Total_loss", "mIoU and fIoU", "PQ, RQ, SQ", "mACC and pACC", "Loss_CE", "Loss_DICE", "Loss_Mask",         # Create titles and ylabels ...
             "Learning_rate", "Pixel_accuracy_per_class", "PQ_per_class", "RQ_per_class", "SQ_per_class", "IoU_per_class"]   # ... for the axes
     colors = ["blue", "red", "black", "green", "magenta", "cyan", "yellow", "deeppink", "purple",       # Create colors for ... 

@@ -68,6 +68,7 @@ def vitrolife_dataset_function(run_mode="train", debugging=False):
                         "image_custom_info": row}                                           # Add all the info from the current row to the dataset
         img_mask_pair_list.append(current_pair)                                             # Append the dictionary for the current pair to the list of images for the given dataset
         count += 1                                                                          # Increase the sample counter 
+        # if count > 25: break
     assert len(img_mask_pair_list) >= 1, print("No image/mask pairs found in {:s} subfolders 'raw_image' and 'masks'".format(vitrolife_dataset_filepath))
     img_mask_pair_list = natsorted(img_mask_pair_list)                                      # Sorting the list assures the same every time this function runs
     if debugging==True: img_mask_pair_list=pickSamplesWithUniquePN(img_mask_pair_list)      # If we are debugging, we'll only get one sample with each number of PN's 
@@ -83,8 +84,8 @@ def register_vitrolife_data_and_metadata_func(debugging=False):
         MetadataCatalog.get("vitrolife_dataset_{:s}".format(split_mode)).set(stuff_classes=class_labels,
                                                                             stuff_colors = stuff_colors,
                                                                             stuff_dataset_id_to_contiguous_id = stuff_id,
-                                                                            ignore_label=0,                         # The model won't be rewarded by predicting background pixels
-                                                                            # ignore_label=255,                       # No labels will be ignored...
+                                                                            # ignore_label=0,                         # The model won't be rewarded by predicting background pixels
+                                                                            ignore_label=255,                       # No labels will be ignored...
                                                                             evaluator_type="sem_seg",
                                                                             num_files_in_dataset=len(DatasetCatalog["vitrolife_dataset_{:}".format(split_mode)]()))
     assert any(["vitrolife" in x for x in list(MetadataCatalog)]), "Datasets have not been registered correctly"    # Assuring the dataset has been registered correctly

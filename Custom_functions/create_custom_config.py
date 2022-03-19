@@ -25,7 +25,6 @@ def accumulate_keys(dct):
     return key_list
 
 
-
 # Define a function to create a custom configuration in the chosen config_dir and takes a namespace option
 def createVitrolifeConfiguration(FLAGS):
     cfg = get_cfg()                                                                         # Get the default configuration from detectron2.
@@ -59,31 +58,35 @@ def changeConfig_withFLAGS(cfg, FLAGS):
     cfg.SOLVER.MAX_ITER = FLAGS.epoch_iter                                                  # <<< Deprecated input argument: Use --num_epochs instead >>>
     cfg.SOLVER.LR_SCHEDULER_NAME = "WarmupMultiStepLR"                                      # Default learning rate scheduler
     cfg.SOLVER.NESTEROV = True                                                              # Whether or not the learning algorithm will use Nesterow momentum
-    cfg.SOLVER.WEIGHT_DECAY = float(2e-3)                                                   # A small lambda value for the weight decay
-    cfg.TEST.AUG.FLIP = False                                                               # No random flipping or augmentation used for inference
+    cfg.SOLVER.WEIGHT_DECAY = float(3e-3)                                                   # A small lambda value for the weight decay
+    cfg.TEST.AUG = False                                                                    # No augmentation used for inference
     cfg.MODEL.PANOPTIC_FPN.COMBINE.ENABLED = False                                          # Disable the panoptic head during inference
     cfg.DATALOADER.NUM_WORKERS = FLAGS.num_workers                                          # Set the number of workers to only 2
     cfg.INPUT.CROP.ENABLED =  FLAGS.crop_enabled                                            # We will not allow any cropping of the input images
     cfg.MODEL.DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'                       # Assign the device on which the model should run
-    cfg.MODEL.MASK_FORMER.DICE_WEIGHT = 7                                                   # Set the weight for the dice loss
-    cfg.MODEL.MASK_FORMER.MASK_WEIGHT = 15                                                  # Set the weight for the mask predictive loss
-    cfg.MODEL.MASK_FORMER.DROPOUT = float(0.2)                                              # We'll set a dropout probability on 0.2 when training
+    cfg.MODEL.MASK_FORMER.DICE_WEIGHT = 8                                                   # Set the weight for the dice loss (original 2)
+    cfg.MODEL.MASK_FORMER.MASK_WEIGHT = 24                                                  # Set the weight for the mask predictive loss (original 20)
+    cfg.MODEL.MASK_FORMER.DROPOUT = float(0.35)                                             # We'll set a dropout probability on 0.3 when training
+    cfg.MODEL.MASK_FORMER.NO_OBJECT_WEIGHT = float(0.1)                                     # The loss weight for the "no-object" label
+    cfg.MODEL.MASK_FORMER.TEST.OVERLAP_THRESHOLD = float(0.025)                             # The threshold for overlapping masks
+    cfg.MODEL.MASK_FORMER.TEST.PANOPTIC_ON = False                                          # Disable the panoptic head for the maskformer 
+    cfg.MODEL.SEM_SEG_HEAD.LOSS_WEIGHT = 1                                                  # Increase loss weight for the sem_seg_head
     cfg.TEST.EVAL_PERIOD = 0                                                                # We won't use the build in evaluation, only the custom evaluation function
     cfg.SOLVER.CHECKPOINT_PERIOD = FLAGS.epoch_iter                                         # Save a new model checkpoint after each epoch, i.e. after everytime the entire trainining set has been seen by the model
-    # cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST = 0.5                                           # Assign the threshold used for the model
+    cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST = 0.05                                            # Assign the IoU threshold used for the model
+    cfg.INPUT.FORMAT = "BGR"                                                                # The input format is set to be BGR, like the visualization method
     cfg.OUTPUT_DIR = os.path.join(MaskFormer_dir, "output_"+FLAGS.output_dir_postfix)       # Get MaskFormer directory and name the output directory
     config_name = "config_initial.yaml"                                                     # Initial name for the configuration that will be saved in the cfg.OUTPUT_DIR
     if "vitrolife" in FLAGS.dataset_name.lower():                                           # If the vitrolife dataset was chosen ...
         cfg.MODEL.SEM_SEG_HEAD.NUM_CLASSES = len(MetadataCatalog[cfg.DATASETS.TEST[0]].stuff_classes)   # Assign the number of classes for the model to segment
-        cfg.INPUT.FORMAT = "BGR"                                                            # The input format is set to be BGR, like the visualization method
         cfg.INPUT.MIN_SIZE_TRAIN = FLAGS.img_size_min                                       # The minimum size length for one side of the training images
         cfg.INPUT.MAX_SIZE_TRAIN = FLAGS.img_size_max                                       # The maximum size length for one side of the training images
         cfg.INPUT.MIN_SIZE_TEST = FLAGS.img_size_min                                        # The minimum size length for one side of the validation images
         cfg.INPUT.MAX_SIZE_TEST = FLAGS.img_size_max                                        # The maximum size length for one side of the validation images
         cfg.MODEL.PIXEL_MEAN = [100.15, 102.03, 103.89]                                     # Write the correct image mean value for the entire vitrolife dataset
         cfg.MODEL.PIXEL_STD = [57.32, 59.69, 61.93]                                         # Write the correct image standard deviation value for the entire vitrolife dataset
-        cfg.SOLVER.STEPS = [int(FLAGS.epoch_iter*x-1) for x in range(5)]                    # <<< Deprecated input argument: Use --patience instead >>>
-        cfg.SOLVER.GAMMA = 0.25                                                             # After every "step" iterations the learning rate will be updated, as new_lr = old_lr*gamma
+        cfg.SOLVER.STEPS = []                                                               # <<< Deprecated input argument: Use --patience instead >>>
+        cfg.SOLVER.GAMMA = FLAGS.lr_gamma                                                   # After every "step" iterations the learning rate will be updated, as new_lr = old_lr*gamma
         cfg.SOLVER.STEPS = np.subtract([int(x+1)*np.min([500, 2+FLAGS.epoch_iter]) for x in range(500)],1).tolist()             # Insert the 'vitrolife' to the output directory, if using the vitrolife dataset
         config_name = "vitrolife_" + config_name                                            # Prepend the config name with "vitrolife"
     if FLAGS.debugging==True:                                                               # If we are debugging the model ...

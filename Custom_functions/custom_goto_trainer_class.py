@@ -1,35 +1,49 @@
 import itertools
-import logging
 import os
 import torch
 import numpy as np
 from copy import copy
 from detectron2.utils import comm
-from collections import OrderedDict
 from typing import Any, Dict, List, Set
 from detectron2.data import build_detection_train_loader, MetadataCatalog
 from detectron2.data.samplers.distributed_sampler import TrainingSampler
 from detectron2.engine import DefaultTrainer, hooks
-from detectron2.engine.hooks import BestCheckpointer
-from detectron2.evaluation import SemSegEvaluator
 from detectron2.projects.deeplab import build_lr_scheduler
 from detectron2.solver.build import maybe_add_gradient_clipping
-from mask_former import MaskFormerSemanticDatasetMapper, SemanticSegmentorWithTTA
+from detectron2.data import transforms as T
+from mask_former import MaskFormerSemanticDatasetMapper
 from fvcore.nn.precise_bn import get_bn_modules
+from torchvision import transforms as T2
+from PIL import Image
+
+# Define a function that will return a list of augmentations to use for training
+def custom_augmentation_mapper(config, is_train=True):
+    transform_list = [                                                      # Initiate the list of image data augmentations to use
+        T.Resize((500,500), Image.BILINEAR),                                # https://detectron2.readthedocs.io/en/latest/modules/data_transforms.html#detectron2.data.transforms.Resize
+        T.RandomBrightness(0.8, 1.5),                                       # https://detectron2.readthedocs.io/en/latest/modules/data_transforms.html#detectron2.data.transforms.RandomBrightness
+        T.RandomLighting(0.7),                                              # https://detectron2.readthedocs.io/en/latest/modules/data_transforms.html#detectron2.data.transforms.RandomLighting
+        T.RandomContrast(0.7, 1.3),                                         # https://detectron2.readthedocs.io/en/latest/modules/data_transforms.html#detectron2.data.transforms.RandomContrast
+        T.RandomSaturation(0.85, 1.15),                                     # https://detectron2.readthedocs.io/en/latest/modules/data_transforms.html#detectron2.data.transforms.RandomSaturation
+        T.RandomRotation(angle=[-45, 45]),                                  # https://detectron2.readthedocs.io/en/latest/modules/data_transforms.html#detectron2.data.transforms.RandomRotation
+        T.RandomFlip(prob=0.25, horizontal=True, vertical=False),           # https://detectron2.readthedocs.io/en/latest/modules/data_transforms.html#detectron2.data.transforms.RandomLighting 
+        T.RandomFlip(prob=0.25, horizontal=False, vertical=True),           # https://detectron2.readthedocs.io/en/latest/modules/data_transforms.html#detectron2.data.transforms.RandomLighting  
+        T.RandomCrop("relative", (0.75, 0.75)),                             # https://detectron2.readthedocs.io/en/latest/modules/data_transforms.html#detectron2.data.transforms.RandomCrop
+        T.Resize((500,500), Image.BILINEAR)]                                # https://detectron2.readthedocs.io/en/latest/modules/data_transforms.html#detectron2.data.transforms.Resize
+    custom_mapper = MaskFormerSemanticDatasetMapper(config, is_train=is_train, augmentations=transform_list)    # Create the mapping from data dictionary to augmented training image
+    return custom_mapper
 
 
+# Custom Trainer class build on the DefaultTrainer class. This is mostly copied from the train_net.py
 class My_GoTo_Trainer(DefaultTrainer):
+    # We'll only use the custom evaluation, not any build-in method...
     @classmethod
     def build_evaluator(cls, cfg, dataset_name, output_folder=None):
-        if output_folder is None:
-            output_folder = os.path.join(cfg.OUTPUT_DIR, "inference")
-        sem_seg_evaluator = SemSegEvaluator(dataset_name, distributed=True, output_dir=output_folder)
-        return sem_seg_evaluator
+        return None
 
     @classmethod
     def build_train_loader(cls, cfg):
         # Semantic segmentation dataset mapper
-        mapper = MaskFormerSemanticDatasetMapper(cfg, True)
+        mapper = custom_augmentation_mapper(config=cfg)
         return build_detection_train_loader(cfg, mapper=mapper, sampler=TrainingSampler(size=MetadataCatalog[cfg.DATASETS.TRAIN[0]].num_files_in_dataset, shuffle=True))
 
     @classmethod

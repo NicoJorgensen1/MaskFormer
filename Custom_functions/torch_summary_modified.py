@@ -7,33 +7,10 @@ from collections import OrderedDict
 import numpy as np
 
 
-def model_summary(model, input_size, logs=None, batch_size=-1, device="cuda"):
 
-    # Define function to log information about the dataset
-    def printAndLog(input_to_write, logs, print_str=True, write_input_to_log=True, prefix="\n", postfix=""):
-        if logs != None:                                                                        # If no logfile has been passed, then the inputs will only be printed, not logged
-            mode = "a" if os.path.isfile(logs) else "w"                                         # Whether or not we are appending to the logfile or creating a new logfile
-            logs = open(file=logs, mode=mode)                                                   # Open the logfile, i.e. making it writable
 
-            # If the input needs to be logged
-            if write_input_to_log==True and isinstance(input_to_write, str):
-                logs.writelines("{:s}{:s}{:s}".format(prefix, input_to_write, postfix))
-            if write_input_to_log==True and isinstance(input_to_write, list):
-                logs.writelines("{:s}".format(prefix))
-                for string in input_to_write: logs.writelines("{}\n".format(string))
-                logs.writelines("{:s}".format(postfix))
-            
-            # Close the logfile again
-            logs.close()
-        
-        # If the input needs to be printed
-        if print_str==True and isinstance(input_to_write, str): print(input_to_write)           # If we need to print the input, we'll print it
-        if print_str==True and isinstance(input_to_write, list):                                # If the input is a list, that should be printed ...
-            for string in input_to_write: print(string)                                         # ... we'll simply print each time in the list
-        
-
+def model_summary(model, input_size, logs=None, batch_size=-1, device="cuda"):        
     def register_hook(module):
-
         def hook(module, input, output):
             class_name = str(module.__class__).split(".")[-1].split("'")[0]
             module_idx = len(summary)
@@ -85,7 +62,7 @@ def model_summary(model, input_size, logs=None, batch_size=-1, device="cuda"):
 
     # batch_size of 2 for batchnorm
     x = [torch.rand(2, *in_size).type(dtype) for in_size in input_size]
-    # print(type(x[0]))
+    print(type(x[0]))
 
     # create properties
     summary = OrderedDict()
@@ -96,15 +73,14 @@ def model_summary(model, input_size, logs=None, batch_size=-1, device="cuda"):
 
     # make a forward pass
     # print(x.shape)
-    try: model(*x)
-    except: pass
+    model(*x)
 
     # remove these hooks
     for h in hooks:
         try: h.remove()
         except: pass
 
-    printAndLog(input_to_write="Model summary:".upper(), logs=logs, prefix="", postfix="")
+    printAndLog(input_to_write="Model summary:".upper(), logs=logs, prefix="\n\n", postfix="")
     single_dash_line = "-"
     single_dash_line = single_dash_line.join(np.repeat(single_dash_line, 40))
     double_dash_line = "="
@@ -133,7 +109,7 @@ def model_summary(model, input_size, logs=None, batch_size=-1, device="cuda"):
     # assume 4 bytes/number (float on cuda).
     total_input_size = abs(np.prod(input_size) * batch_size * 4. / (1024 ** 2.))
     total_output_size = abs(2. * total_output * 4. / (1024 ** 2.))  # x2 for gradients
-    total_params_size = abs(total_params.numpy() * 4. / (1024 ** 2.))
+    total_params_size = abs(total_params * 4. / (1024 ** 2.))
     total_size = total_params_size + total_output_size + total_input_size
     
     printAndLog(input_to_write=double_dash_line, logs=logs)

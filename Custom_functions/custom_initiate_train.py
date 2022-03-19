@@ -23,23 +23,30 @@ assert os.path.isdir(dataset_dir), "The dataset directory doesn't exist in the c
 os.environ["DETECTRON2_DATASETS"] = dataset_dir
 
 # Import important libraries
-import shutil
-import numpy as np
-from custom_setup_func import setup_func, zip_output, SaveHistory, printAndLog      # Assign script to GPU, register vitrolife dataset, create config, zip the output_dir and save the history_dict
+import shutil                                                                       # Used to copy/rename the metrics.json file after each training/validation step
+import numpy as np                                                                  # Used for algebraic equations
+from time import time                                                               # Used to time the epoch/training duration
+from custom_setup_func import setup_func, zip_output, SaveHistory, printAndLog, getBestEpochResults # Assign to GPU, register vitrolife dataset, create config, zip output_dir, save history_dict, log results, get best results
 from custom_train_func import launch_custom_training                                # Function to launch the training with the given dataset
 from visualize_vitrolife_batch import putModelWeights, visualize_the_images         # Functions to put model_weights in the config and visualizing the image batch
-from show_learning_curves import show_history                                       # Function used to plot the learning curves for the given training
+from show_learning_curves import show_history, combineDataToHistoryDictionaryFunc   # Function used to plot the learning curves for the given training and to add results to the history dictionary
 from custom_evaluation_func import evaluateResults                                  # Function to evaluate the metrics for the segmentation
-from custom_callback_functions import early_stopping, lr_scheduler, keepAllButLatestAndBestModel    # Callback functions for early stopping, lr_scheduling and ModelCheckpoints
+from custom_callback_functions import early_stopping, lr_scheduler, keepAllButLatestAndBestModel, computeRemainingTime, updateLogsFunc  # Callback functions for model training
 from custom_pq_eval_func import pq_evaluation
-from torch_summary_modified import model_summary 
 
 
 # Get the FLAGS and config variables
 FLAGS, cfg, log_file = setup_func()
 
 # Create properties
+train_loader = None
+train_evaluator = None
+val_loader = None
+val_evaluator = None
 history = None
+train_mode = "min" if "loss" in FLAGS.eval_metric else "max"
+new_best = np.inf if train_mode=="min" else -np.inf
+best_epoch = 0
 train_dataset = cfg.DATASETS.TRAIN
 val_dataset = cfg.DATASETS.TEST
 base_lr = FLAGS.learning_rate
@@ -50,15 +57,17 @@ fig_list_before, data_batches, cfg, FLAGS = visualize_the_images(config=cfg, FLA
 
 if FLAGS.inference_only == False:
     # Train the model
+    train_start_time = time()                                                       # Now the training starts
     for epoch in range(FLAGS.num_epochs):                                           # Iterate over the chosen amount of epochs
         # Training period. Will train the model, correct the metrics files and evaluate performance on the training data
+        epoch_start_time = time()                                                   # Now this new epoch starts
         trainer_class = launch_custom_training(FLAGS=FLAGS, config=cfg)             # Launch the training loop for one epoch
         shutil.copyfile(os.path.join(cfg.OUTPUT_DIR, "metrics.json"),               # Rename the metrics.json to train_metricsX.json ...
             os.path.join(cfg.OUTPUT_DIR, "train_metrics_{:d}.json".format(epoch+1)))# ... where X is the current epoch number
         os.remove(os.path.join(cfg.OUTPUT_DIR, "metrics.json"))                     # Remove the original metrics file
         os.rename(os.path.join(cfg.OUTPUT_DIR, "model_final.pth"),                  # Rename the model that is automatically saved after each epoch ...
             os.path.join(cfg.OUTPUT_DIR, "model_epoch_{:d}.pth".format(epoch+1)))   # ... to model_epoch_x (where x is current epoch number)
-        eval_train_results = evaluateResults(FLAGS, cfg, data_split="train", trainer=trainer_class) # Evaluate the result metrics on the training set
+        eval_train_results, train_loader, train_evaluator = evaluateResults(FLAGS, cfg, data_split="train", dataloader=train_loader, evaluator=train_evaluator) # Evaluate the result metrics on the training set
         train_pq_results = pq_evaluation(args=FLAGS, config=cfg, data_split="train")# Evaluate the Panoptic Quality for the training semantic segmentation results
 
         # Validation period. Will 'train' with lr=0 on validation data, correct the metrics files and evaluate performance on validation data
@@ -70,7 +79,7 @@ if FLAGS.inference_only == False:
             os.path.join(cfg.OUTPUT_DIR, "val_metrics_{:d}.json".format(epoch+1)))  # ... where X is the current epoch number
         os.remove(os.path.join(cfg.OUTPUT_DIR, "metrics.json"))                     # Remove the original metrics file
         os.remove(os.path.join(cfg.OUTPUT_DIR, "model_final.pth"))                  # Remove the model that will be saved after validation
-        eval_val_results = evaluateResults(FLAGS, cfg, data_split="val", trainer=trainer_class) # Evaluate the result metrics on the training set
+        eval_val_results, val_loader, val_evaluator = evaluateResults(FLAGS, cfg, data_split="val", dataloader=val_loader, evaluator=val_evaluator) # Evaluate the result metrics on the training set
         val_pq_results = pq_evaluation(args=FLAGS, config=cfg, data_split="val")    # Evaluate the Panoptic Quality for the validation semantic segmentation results
         
         # Prepare for the training phase of the next epoch. Switch back to training dataset, save history and learning curves and visualize segmentation results
@@ -80,7 +89,7 @@ if FLAGS.inference_only == False:
         SaveHistory(historyObject=history, save_folder=cfg.OUTPUT_DIR)              # Save the history dictionary after each epoch
         [os.remove(os.path.join(cfg.OUTPUT_DIR, x)) for x in os.listdir(cfg.OUTPUT_DIR) if "events.out.tfevent" in x]
         if np.mod(np.add(epoch,1), FLAGS.display_rate) == 0:                        # Every 'display_rate' epochs, the model will segment the same images again ...
-            _,data_batches,cfg,FLAGS = visualize_the_images(cfg,FLAGS,data_batches, epoch+1)    # ... segment and save visualizations
+            _,data_batches,cfg,FLAGS = visualize_the_images(config=cfg, FLAGS=FLAGS, data_batches=data_batches, epoch_num=epoch+1)    # ... segment and save visualizations
         
         # Performing callbacks
         cfg = keepAllButLatestAndBestModel(cfg=cfg, history=history, FLAGS=FLAGS)   # Keep only the best and the latest model weights. The rest are deleted.
@@ -91,21 +100,39 @@ if FLAGS.inference_only == False:
         if epoch+1 >= FLAGS.early_stop_patience:                                    # If the model has trained for more than 'early_stopping_patience' epochs ...
             quit_training = early_stopping(history=history, FLAGS=FLAGS)            # ... perform the early stopping callback
             if quit_training == True: break                                         # If the early stopping callback says we need to quit the training, break the for loop and stop running more epochs
-
+        string1, string2 = computeRemainingTime(epoch=epoch, num_epochs=FLAGS.num_epochs, train_start_time=train_start_time, epoch_start_time=epoch_start_time)
+        new_best, best_epoch = updateLogsFunc(log_file=log_file, FLAGS=FLAGS, metrics_train=eval_train_results["sem_seg"], metrics_val=eval_val_results["sem_seg"],
+                                            history=history, best_val=new_best, train_start=train_start_time, epoch_start=epoch_start_time, best_epoch=best_epoch)
 
     # Visualize the same images, now with a trained model
     cfg = keepAllButLatestAndBestModel(cfg=cfg, history=history, FLAGS=FLAGS, bestOrLatest="best")  # Put the model weights for the best performing model on the config
     fig_list_after, data_batches, cfg, FLAGS = visualize_the_images(                # Visualize the same images ...
-        config=cfg,FLAGS=FLAGS, data_batches=data_batches, model_has_trained=True)  # ... now after the model has trained
+        config=cfg,FLAGS=FLAGS, data_batches=data_batches, model_done_training=True)  # ... now after the model has trained
 
 # Evaluation on the vitrolife test dataset. There is no ADE20K test dataset.
 if FLAGS.debugging == False and "vitrolife" in FLAGS.dataset_name.lower():          # Inference will only be performed if we are not debugging the model and working on the vitrolife dataset
     cfg.DATASETS.TEST = ("vitrolife_dataset_test",)                                 # The inference will be done on the test dataset
-    eval_test_results = evaluateResults(FLAGS, cfg, data_split="test")              # Evaluate the result metrics on the validation set with the best performing model
+    eval_test_results,_,_ = evaluateResults(FLAGS, cfg, data_split="test")          # Evaluate the result metrics on the validation set with the best performing model
     test_pq_results = pq_evaluation(args=FLAGS, config=cfg, data_split="test")      # Evaluate the Panoptic Quality for the test semantic segmentation results
+    history = combineDataToHistoryDictionaryFunc(config=cfg, eval_metrics=eval_test_results["sem_seg"], pq_metrics=test_pq_results, data_split="test", history=history)
+    test_history = {}
+    for key in history.keys():
+        if "test" in key:
+            test_history[key] = history[key][-1]
 
+# Print and log the best metric results
+printAndLog(input_to_write="Final results:".upper(), logs=log_file)
+printAndLog(input_to_write="Best validation results:".ljust(25)+"Epoch {:d}:".format(best_epoch).ljust(12), logs=log_file)
+printAndLog(input_to_write=getBestEpochResults(history, best_epoch), logs=log_file, prefix="")
+if "test" in cfg.DATASETS.TEST[0]:
+    printAndLog(input_to_write="Test results: ", logs=log_file)
+    printAndLog(input_to_write=test_history, logs=log_file, prefix="")
 
-# Remove all metrics.json files and zip the resulting output directory
+# Remove all metrics.json files, the default log-file and zip the resulting output directory
 [os.remove(os.path.join(cfg.OUTPUT_DIR, x)) for x in os.listdir(cfg.OUTPUT_DIR) if "metrics" in x.lower() and x.endswith(".json")]
+os.remove(os.path.join(cfg.OUTPUT_DIR, "log.txt"))
 zip_output(cfg)
+
+
+
 
