@@ -146,15 +146,6 @@ class My_GoTo_Trainer(DefaultTrainer):
         if comm.is_main_process():
             ret.append(hooks.PeriodicCheckpointer(self.checkpointer, cfg.SOLVER.CHECKPOINT_PERIOD))
 
-        # def test_and_save_results():
-        #     self._last_eval_results = self.test(self.cfg, self.model)
-        #     return self._last_eval_results
-
-        # Do evaluation after checkpointer, because then if it fails,
-        # we can use the saved checkpoint to debug.
-        # ret.append(hooks.EvalHook(cfg.TEST.EVAL_PERIOD, test_and_save_results))
-        # ret.append(hooks.EvalHook(0, test_and_save_results))
-
         if comm.is_main_process():
             # Here the default print/log frequency of each writer is used.
             # run writers in the end, so that evaluation metrics are written

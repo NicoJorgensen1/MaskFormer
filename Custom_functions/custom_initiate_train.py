@@ -25,17 +25,18 @@ os.environ["DETECTRON2_DATASETS"] = dataset_dir
 # Import important libraries
 import shutil
 import numpy as np
-from custom_setup_func import setup_func, zip_output, SaveHistory                   # Assign script to GPU, register vitrolife dataset, create config, zip the output_dir and save the history_dict
+from custom_setup_func import setup_func, zip_output, SaveHistory, printAndLog      # Assign script to GPU, register vitrolife dataset, create config, zip the output_dir and save the history_dict
 from custom_train_func import launch_custom_training                                # Function to launch the training with the given dataset
 from visualize_vitrolife_batch import putModelWeights, visualize_the_images         # Functions to put model_weights in the config and visualizing the image batch
 from show_learning_curves import show_history                                       # Function used to plot the learning curves for the given training
 from custom_evaluation_func import evaluateResults                                  # Function to evaluate the metrics for the segmentation
 from custom_callback_functions import early_stopping, lr_scheduler, keepAllButLatestAndBestModel    # Callback functions for early stopping, lr_scheduling and ModelCheckpoints
 from custom_pq_eval_func import pq_evaluation
+from torch_summary_modified import model_summary 
 
 
 # Get the FLAGS and config variables
-FLAGS, cfg = setup_func()
+FLAGS, cfg, log_file = setup_func()
 
 # Create properties
 history = None

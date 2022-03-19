@@ -1,6 +1,5 @@
 # Import libraries
-import os
-from tkinter.tix import Tree                                                                   # Used to navigate the folder structure in the current os
+import os                                                                   # Used to navigate the folder structure in the current os
 import numpy as np                                                          # Used for computing the iterations per epoch
 import argparse                                                             # Used to parse input arguments through command line
 import pickle                                                               # Used to save the history dictionary after training
@@ -11,6 +10,37 @@ from detectron2.engine import default_argument_parser                       # De
 from GPU_memory_ranked_assigning import assign_free_gpus                    # Function to assign the script to a given number of GPUs
 from register_vitrolife_dataset import register_vitrolife_data_and_metadata_func        # Register the vitrolife dataset and metadata in the Detectron2 dataset catalog
 from create_custom_config import createVitrolifeConfiguration, changeConfig_withFLAGS   # Function to create a configuration used for training 
+from detectron2.modeling import build_model
+
+# model = build_model(cfg=cfg)
+
+
+# Define function to log information about the dataset
+def printAndLog(input_to_write, logs, print_str=True, write_input_to_log=True, prefix="\n", postfix="", oneline=True):
+    mode = "a" if os.path.isfile(logs) else "w"                             # Whether or not we are appending to the logfile or creating a new logfile
+    logs = open(file=logs, mode=mode)                                       # Open the logfile, i.e. making it writable
+    
+    if isinstance(input_to_write, str):                                     # If the input is of type string ...
+        if print_str: print(input_to_write)                                 # ... and it needs to be printed, print it ...
+        if write_input_to_log: logs.writelines("{:s}{:s}{:s}".format(prefix, input_to_write, postfix))  # ... if it needs to be logged, write it to log
+    if isinstance(input_to_write, list):                                    # If the input is a list ...
+        if print_str:                                                       # ... and the list needs to be printed ...
+            for string in input_to_write: print(string, end="\t" if oneline else "\n")  # ... print every item in the list
+        if write_input_to_log:                                              # ... if the input needs to be logged ...
+            if write_input_to_log: logs.writelines("{:s}".format(prefix))   # ... the prefix is written ...
+            for string in input_to_write: logs.writelines("{}\n".format(string))    # ... and then each item in the list is written on a new line ...
+            logs.writelines("{:s}".format(postfix))                         # ... and then the postfix is written
+    if isinstance(input_to_write, dict):                                    # If the input is a dictionary ...
+        if write_input_to_log: logs.writelines("{:s}".format(prefix))       # ... and the input must be logged, the prefix is written ...
+        if write_input_to_log or print_str:                                 # ... or if the input has to be either logged or printed ...
+            for key in input_to_write.keys():                               # ... and then we loop over all key-value pairs in the dictionary ...
+                string = "{:<25}{:s} ".format(key+":" + "{}".format(input_to_write[key], "\n" if oneline else "||"))    # ... to create a string of the current key-value pair ...
+                if write_input_to_log: logs.writelines(string)              # ... to log the pair on the same line ...
+                if print_str: print(string, end="\t" if oneline else "\n")  # ... and print it if chosen ...
+        if write_input_to_log: logs.writelines("{:s}".format(postfix))      # ... before writing the postfix 
+    
+    # Close the logfile again
+    logs.close()                                                            # Close the logfile again
 
 
 # Function to rename the automatically created "inference" directory in the OUTPUT_DIR from "inference" to "validation" before performing actual inference with the test set
@@ -98,6 +128,16 @@ FLAGS.epoch_iter = int(np.floor(np.divide(FLAGS.num_train_files, FLAGS.batch_siz
 FLAGS.num_classes = len(MetadataCatalog[cfg.DATASETS.TRAIN[0]].stuff_classes)       # Get the number of classes in the current dataset
 cfg = changeConfig_withFLAGS(cfg=cfg, FLAGS=FLAGS)                          # Set the final values for the config
 
+
+# Create the log file
+log_file = os.path.join(cfg.OUTPUT_DIR, "Training_logs.txt")
+if os.path.exists(log_file): os.remove(log_file)
+
+# Initiate the log file
+start_time_readable = "{:s}:{:s} {:s}-{:s}-{:s}".format(start_time[:2], start_time[3:5], start_time[6:8], start_time[8:11], start_time[11:])
+printAndLog(input_to_write="Training initiated at {:s}".format(start_time_readable).upper(), logs=log_file, prefix="")
+printAndLog(input_to_write=vars(FLAGS), logs=log_file, oneline=False)
+
 # Return the values again
-def setup_func(): return FLAGS, cfg
+def setup_func(): return FLAGS, cfg, log_file
 

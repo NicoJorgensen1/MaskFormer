@@ -1,7 +1,6 @@
 # Import libraries
 import os                                                                                               # Used to navigate different paths on the system
-import json
-from tkinter import TRUE                                                                                             # Used to read the metrics_files from the output_dir
+import json                                                                                             # Used to read the metrics_files from the output_dir
 import numpy as np                                                                                      # Used for division and floor/ceil operations here
 import matplotlib.pyplot as plt                                                                         # The plotting package
 from natsort import natsorted                                                                           # Function to natural sort a list or array 
