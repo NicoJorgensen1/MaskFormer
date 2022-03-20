@@ -31,8 +31,9 @@ from custom_train_func import launch_custom_training                            
 from visualize_image_batch import putModelWeights, visualize_the_images             # Functions to put model_weights in the config and visualizing the image batch
 from show_learning_curves import show_history, combineDataToHistoryDictionaryFunc   # Function used to plot the learning curves for the given training and to add results to the history dictionary
 from custom_evaluation_func import evaluateResults                                  # Function to evaluate the metrics for the segmentation
-from custom_callback_functions import early_stopping, lr_scheduler, keepAllButLatestAndBestModel, computeRemainingTime, updateLogsFunc, plot_confusionMatrix  # Callback functions for model training
+from custom_callback_functions import early_stopping, lr_scheduler, keepAllButLatestAndBestModel, computeRemainingTime, updateLogsFunc  # Callback functions for model training
 from custom_pq_eval_func import pq_evaluation                                       # Used to perform the panoptic quality evaluation on the semantic segmentation results
+from visualize_conf_matrix import plot_confusion_matrix                             # Function to plot the available confusion matrixes
 
 
 # Get the FLAGS and config variables
@@ -86,6 +87,7 @@ if FLAGS.inference_only == False:
         [os.remove(os.path.join(cfg.OUTPUT_DIR, x)) for x in os.listdir(cfg.OUTPUT_DIR) if "events.out.tfevent" in x]
         if np.mod(np.add(epoch,1), FLAGS.display_rate) == 0:                        # Every 'display_rate' epochs, the model will segment the same images again ...
             _,data_batches,cfg,FLAGS = visualize_the_images(config=cfg, FLAGS=FLAGS, data_batches=data_batches, epoch_num=epoch+1)    # ... segment and save visualizations
+            _ = plot_confusion_matrix(config=cfg, epoch=epoch+1, conf_train=conf_matrix_train, conf_val=conf_matrix_val)
         
         # Performing callbacks
         cfg = keepAllButLatestAndBestModel(cfg=cfg, history=history, FLAGS=FLAGS)   # Keep only the best and the latest model weights. The rest are deleted.
@@ -108,6 +110,7 @@ if FLAGS.inference_only == False:
 if FLAGS.debugging == False and "vitrolife" in FLAGS.dataset_name.lower():          # Inference will only be performed if we are not debugging the model and working on the vitrolife dataset
     cfg.DATASETS.TEST = ("vitrolife_dataset_test",)                                 # The inference will be done on the test dataset
     eval_test_results,_,_,conf_matrix_test = evaluateResults(FLAGS, cfg, data_split="test") # Evaluate the result metrics on the validation set with the best performing model
+    _ = plot_confusion_matrix(config=cfg, conf_train=conf_matrix_train, conf_val=conf_matrix_val, conf_test=conf_matrix_test, done_training=True)
     test_pq_results = pq_evaluation(args=FLAGS, config=cfg, data_split="test")      # Evaluate the Panoptic Quality for the test semantic segmentation results
     history = combineDataToHistoryDictionaryFunc(config=cfg, eval_metrics=eval_test_results["sem_seg"], pq_metrics=test_pq_results, data_split="test", history=history)
     test_history = {}
