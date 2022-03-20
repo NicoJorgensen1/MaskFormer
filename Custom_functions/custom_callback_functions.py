@@ -1,10 +1,9 @@
 # Import libraries
 import os
-from sys import prefix
 import numpy as np
 from time import time                                                               # Used to time the epoch training duration
 from natsort import natsorted                                                       # Used to sort the list of model_files saved 
-from visualize_vitrolife_batch import extractNumbersFromString                      # Function to extract numbers from a string
+from visualize_image_batch import extractNumbersFromString                          # Function to extract numbers from a string
 from custom_setup_func import printAndLog                                           # Used to update the log file
 
 # Define a function to commit early stopping

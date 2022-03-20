@@ -83,7 +83,7 @@ def create_batch_img_ytrue_ypred(config, data_split, FLAGS, data_batch=None):
         else: dataset_dicts = DatasetCatalog.get("ade20k_sem_seg_{:s}".format(data_split))  # Else we use the ADE20K dataset
         config = putModelWeights(config)                                            # Add the newest model weights to the configuration
         if "train" in data_split: data_mapper = custom_augmentation_mapper(config=config, is_train=True)    # Use the custom data augmentation mapper for training images
-        else: data_mapper = DatasetMapper(config, is_train=False, augmentations=[]) # Use the regular, default mapper for val+test images
+        else: data_mapper = DatasetMapper(config, is_train=False, augmentations=[]) # Use the regular, default mapper for val+test images without any augmentation
         dataloader = build_detection_train_loader(dataset_dicts, mapper=data_mapper, total_batch_size=np.min([FLAGS.num_images, len(dataset_dicts)]))   # Create the dataloader
         data_batch = next(iter(dataloader))                                         # Extract the next batch from the dataloader
     img_ytrue_ypred = {"input": list(), "y_pred": list(), "y_true": list(), "PN": list()}   # Initiate a dictionary to store the input images, ground truth masks and the predicted masks
@@ -127,10 +127,10 @@ def visualize_the_images(config, FLAGS, position=[0.55, 0.08, 0.40, 0.75], epoch
     # Get the datasplit and number of images to show
     fig_list, data_batches_final = list(), list()                                   # Initiate the list to store the figures in
     if data_batches==None: data_batches = [None, None, None]                        # If no previous data has been sent, it must be a list of None's...
-    data_split_count = 1
+    data_split_count = 1                                                            # Initiate the datasplit counter
     fontdict = {'fontsize': 25}                                                     # Set the font size for the plot
     for data_split, data_batch in tqdm(zip(["train", "val", "test"], data_batches), # Iterate through the three splits available
-                leave=True, unit="Data_split", total=3, ascii=True,  desc="Dataset split {:d}/{:d}".format(data_split_count, 3),
+                unit="Data_split", ascii=True, desc="Dataset split {:d}/{:d}".format(data_split_count, 3),
                 bar_format="{desc}  | {percentage:3.0f}% | {bar:35}| {n_fmt}/{total_fmt} [Spent: {elapsed}. Remaining: {remaining}{postfix}]"):      
         data_split_count += 1
         if "vitrolife" not in FLAGS.dataset_name.lower() and data_split=="test": continue   # Only vitrolife has a test dataset. ADE20K doesn't. 

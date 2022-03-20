@@ -45,7 +45,7 @@ def evaluateResults(FLAGS, cfg, data_split="train",  dataloader=None, evaluator=
     # Build the dataloader if no dataloader has been sent to the function as an input
     if dataloader == None:
         dataloader = iter(build_detection_train_loader(DatasetCatalog.get(dataset_name),
-            mapper=DatasetMapper(cfg, is_train=False), total_batch_size=1, num_workers=1))
+            mapper=DatasetMapper(cfg, is_train=False, augmentations=[]), total_batch_size=1, num_workers=1))
     
     # Create the predictor and evaluator instances
     predictor = DefaultPredictor(cfg=cfg)

@@ -5,7 +5,7 @@ import numpy as np                                                              
 import matplotlib.pyplot as plt                                                                         # The plotting package
 from natsort import natsorted                                                                           # Function to natural sort a list or array 
 from copy import deepcopy                                                                               # Used to make a copy of the key-name before replacing class name with class idx
-from visualize_vitrolife_batch import extractNumbersFromString                                          # Function to extract numbers from a string
+from visualize_image_batch import extractNumbersFromString                                              # Function to extract numbers from a string
 from detectron2.data import MetadataCatalog                                                             # Catalogs for metadata for registered datasets
 
 # config = cfg
