@@ -38,6 +38,7 @@ from custom_pq_eval_func import pq_evaluation
 # Get the FLAGS and config variables
 FLAGS, cfg, log_file = setup_func()
 
+
 # Create properties
 train_loader = None
 train_evaluator = None

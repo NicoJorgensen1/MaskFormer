@@ -3,15 +3,14 @@
 
 import json
 import os
-import torch
 import numpy as np
 from collections import defaultdict
 from tqdm import tqdm
 from detectron2.data import MetadataCatalog
 from detectron2.data.detection_utils import read_image
-from detectron2.utils.file_io import PathManager
 from pycocotools import mask as maskUtils
 from panopticapi.evaluation import PQStat
+from PIL import Image 
 
 
 
@@ -150,8 +149,11 @@ def pq_evaluation(args, config, data_split="train"):
                 bar_format="{desc}  | {percentage:3.0f}% | {bar:45}| {n_fmt}/{total_fmt} | [Spent: {elapsed}. Remaining: {remaining}{postfix}]"):
         if args.dataset_name == "ade20k_sem_seg_train":
             gt_dir = os.path.join(_root, "ADEChallengeData2016", "annotations_detectron2", "training")
-            segm_gt = read_image(os.path.join(gt_dir, image_id + ".png")).copy().astype(np.int64)
-        if args.dataset_name == "ade20k_sem_seg_val":
+            gt_image_file = [x for x in os.listdir(gt_dir) if image_id.lower() in x.lower()]
+            assert len(gt_image_file) == 1, "There should be one and only one mask image file per raw image"
+            gt_image_file = gt_image_file[0]
+            segm_gt = read_image(os.path.join(gt_dir, gt_image_file)).copy().astype(np.int64)
+        elif args.dataset_name == "ade20k_sem_seg_val":
             gt_dir = os.path.join(_root, "ADEChallengeData2016", "annotations_detectron2", "validation")
             segm_gt = read_image(os.path.join(gt_dir, image_id + ".png")).copy().astype(np.int64)
         elif args.dataset_name == "coco_2017_test_stuff_10k_sem_seg":
@@ -181,6 +183,8 @@ def pq_evaluation(args, config, data_split="train"):
             else:
                 category_id = ann["category_id"]
             mask = maskUtils.decode(ann["segmentation"])
+            if mask.shape != segm_dt.shape:
+                mask = np.asarray(Image.fromarray(mask).resize(segm_dt.shape, resample=Image.NEAREST)).T
             segm_dt[mask > 0] = category_id
 
         # miou

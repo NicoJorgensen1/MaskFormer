@@ -48,7 +48,8 @@ def load_json_metrics(config, data_split="train"):
 # Create a function to replace the class_name in a string with the corresponding class_idx
 def changeClassNameForClassIdxFunc(key, config):
     class_names = MetadataCatalog[config.DATASETS.TRAIN[0]].stuff_classes                               # Get the class names for the dataset
-    class_indices = list(MetadataCatalog[config.DATASETS.TRAIN[0]].stuff_dataset_id_to_contiguous_id.keys())    # Get the class indices for the dataset
+    try: class_indices = list(MetadataCatalog[config.DATASETS.TRAIN[0]].stuff_dataset_id_to_contiguous_id.keys())   # Get the class indices for the dataset ...
+    except: class_indices = list(range(len(class_names)))                                               # ... or if that is not possible, assume class indices are a list from [0, K-1]
     for class_name, class_lbl in zip(class_names, class_indices):                                       # Iterate over all the class names and the corresponding class labels
         if class_name.lower() in key.lower():                                                           # If the class name is in the key name ...
             key = key.lower().replace(class_name.lower(), "C{:d}".format(class_lbl))                    # ... the class_name part is replaced with the corresponding class label
