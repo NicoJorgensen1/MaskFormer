@@ -32,25 +32,20 @@ from visualize_image_batch import putModelWeights, visualize_the_images         
 from show_learning_curves import show_history, combineDataToHistoryDictionaryFunc   # Function used to plot the learning curves for the given training and to add results to the history dictionary
 from custom_evaluation_func import evaluateResults                                  # Function to evaluate the metrics for the segmentation
 from custom_callback_functions import early_stopping, lr_scheduler, keepAllButLatestAndBestModel, computeRemainingTime, updateLogsFunc  # Callback functions for model training
-from custom_pq_eval_func import pq_evaluation
+from custom_pq_eval_func import pq_evaluation                                       # Used to perform the panoptic quality evaluation on the semantic segmentation results
 
 
 # Get the FLAGS and config variables
 FLAGS, cfg, log_file = setup_func()
 
-
 # Create properties
-train_loader = None
-train_evaluator = None
-val_loader = None
-val_evaluator = None
-history = None
-train_mode = "min" if "loss" in FLAGS.eval_metric else "max"
-new_best = np.inf if train_mode=="min" else -np.inf
-best_epoch = 0
-train_dataset = cfg.DATASETS.TRAIN
-val_dataset = cfg.DATASETS.TEST
-base_lr = FLAGS.learning_rate
+train_loader, val_loader, train_evaluator, val_evaluator, history = None, None, None, None, None    # Initiates all the loaders, evaluators and history as None type objects
+train_mode = "min" if "loss" in FLAGS.eval_metric else "max"                        # Compute the mode of which the performance should be measured. Either a negative or a positive value is better
+new_best = np.inf if train_mode=="min" else -np.inf                                 # Initiate the original "best_value" as either infinity or -infinity according to train_mode
+best_epoch = 0                                                                      # Initiate the best epoch as being epoch_0, i.e. before doing any model training
+train_dataset = cfg.DATASETS.TRAIN                                                  # Get the training dataset name
+val_dataset = cfg.DATASETS.TEST                                                     # Get the validation dataset name
+base_lr = FLAGS.learning_rate                                                       # Get the initial learning rate. Used for the lr_scheduler callback.
 lr_update_check = np.zeros((FLAGS.patience, 1), dtype=bool)                         # Preallocating array to determine whether or not the learning rate was updated
 
 # Visualize some random images

@@ -323,7 +323,7 @@ if __name__ == "__main__":
     color_palette = np.array(PALETTE)
     assert len(np.unique(color_palette, axis=0)) == 150
 
-    dataset_dir = os.getenv("DETECTRON2_DATASETS", "datasets")
+    dataset_dir = os.getenv("DETECTRON2_DATASETS")
 
     for name, dirname in [("train", "training"), ("val", "validation")]:
         image_dir = os.path.join(dataset_dir, f"ADEChallengeData2016/images/{dirname}/")
