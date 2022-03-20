@@ -1,10 +1,15 @@
 # Import libraries
 import os
+from tkinter.messagebox import NO
 import numpy as np
 from time import time                                                               # Used to time the epoch training duration
 from natsort import natsorted                                                       # Used to sort the list of model_files saved 
 from visualize_image_batch import extractNumbersFromString                          # Function to extract numbers from a string
 from custom_setup_func import printAndLog                                           # Used to update the log file
+import matplotlib
+matplotlib.use("pdf")
+from matplotlib import pyplot as plt
+
 
 # Define a function to commit early stopping
 def early_stopping(history, FLAGS, quit_training=False):
@@ -68,11 +73,11 @@ def secondsToDaysHrsMinSec(seconds):
 # Compute remaining time 
 def computeRemainingTime(epoch=0, num_epochs=None, train_start_time=time(), epoch_start_time=time()):
     # Compute time left for training and print it out if wanted
-    epoch_duration = time() - epoch_start_time                              # Calculate how long this epoch has taken
-    train_duration = time() - train_start_time                              # Calculate how long the training so far has taken
-    estTrainTime = train_duration * num_epochs/(epoch+1)                    # Estimate how long the entire training will take
-    timeLeft = estTrainTime - train_duration                                # Estimate how much of the entire training time is remaining
-    epochs_left = num_epochs-epoch-1                                        # Compute how many epochs are remaining
+    epoch_duration = time() - epoch_start_time                                      # Calculate how long this epoch has taken
+    train_duration = time() - train_start_time                                      # Calculate how long the training so far has taken
+    estTrainTime = train_duration * num_epochs/(epoch+1)                            # Estimate how long the entire training will take
+    timeLeft = estTrainTime - train_duration                                        # Estimate how much of the entire training time is remaining
+    epochs_left = num_epochs-epoch-1                                                # Compute how many epochs are remaining
 
     # Print and log the timed results
     string1 = "Now this {:.0f}. of {:.0f} epochs took {:s}, making the total training time {:s}".format(epoch+1, num_epochs, secondsToDaysHrsMinSec(epoch_duration), secondsToDaysHrsMinSec(train_duration))
@@ -80,12 +85,17 @@ def computeRemainingTime(epoch=0, num_epochs=None, train_start_time=time(), epoc
     return string1, string2
 
 # Write to the log file if the model has improved
-def updateLogsFunc(log_file, FLAGS, metrics_train, metrics_val, history, best_val, train_start, epoch_start, best_epoch):
+def updateLogsFunc(log_file, FLAGS, history, best_val, train_start, epoch_start, best_epoch):
     epoch = np.max(history["train_epoch_num"])
     string1, string2 = computeRemainingTime(epoch=epoch-1, num_epochs=FLAGS.num_epochs, train_start_time=train_start, epoch_start_time=epoch_start)
     
-    # Do something with reading train + val metrics directly from history dictionary
+    # Read the latest evaluation results
+    metrics_train_keys = [x for x in history.keys() if "train" in x and any([y in x for y in ["IoU", "ACC"]])]
+    metrics_val_keys = [x for x in history.keys() if "val" in x and any([y in x for y in ["IoU", "ACC"]])]
+    metrics_train = {key: history[key][-1] for key in metrics_train_keys}
+    metrics_val = {key: history[key][-1] for key in metrics_val_keys}
 
+    # Update the logfile 
     train_mode = "min" if "loss" in FLAGS.eval_metric else "max"
     printAndLog(input_to_write=string1, logs=log_file, prefix="\n", postfix="\n")
     printAndLog(input_to_write="Train metrics:".ljust(25), logs=log_file, prefix="", postfix="")
@@ -101,3 +111,60 @@ def updateLogsFunc(log_file, FLAGS, metrics_train, metrics_val, history, best_va
     if epoch < FLAGS.num_epochs:
         printAndLog(input_to_write=string2, logs=log_file, prefix="")
     return best_val, best_epoch
+
+
+# Defines a function to plot the confusion matrix - with or without row normalization
+def plot_confusionMatrix(CONF_MATRIXES, classes, TITLE_PREFIX, normalization=False):
+    count = 0                                                                       # Initiates a counter for the #count confMatrix to calculate
+    for title_prefix, confMatrix in zip(TITLE_PREFIX, CONF_MATRIXES):               # Loops through all the data inputs
+        # Computes the first confusion matrix, sets plot title and text format
+        confMatrix_norm = deepcopy(confMatrix).astype(float)                    # ... then the confusion matrix is being calculated as floats...
+        sum_rows = np.sum(confMatrix_norm, axis=1)                              # the sum of each row is then being found...
+        for row in range(confMatrix_norm.shape[0]):                             # then we loop over each row of the matrix ...
+            for col in range(confMatrix_norm.shape[1]):                         # and each column
+                confMatrix_norm[row, col] = confMatrix_norm[row, col] / sum_rows[row]   # and divide every pixel with the sum of the particalur row
+                title_name = "Normalized confusion matrix"                      # Changing the title to "Normalized confusion matrix"
+                fmt = '.2f'                                                     # Setting the format for which to display values to .2f, meaning two decimal points will be shown
+        # T = "Confusion matrix"                                                  # letting the title be "Confusion matrix"
+        # fmt = 'd'                                                               # and the display format will be 'd', meaning only the raw integer value will be shown
+  
+        # Combines the input title with the "(normalized) confusion matrix" suffix and capitalize the first letter of the title
+        if title_prefix.isupper() and title_prefix.isalpha():
+            s = title_prefix + " " + title_name.lower()
+        else:
+            s = title_prefix + " " + title_name
+            s = s.lower().capitalize()
+
+        # Create a figure for the plot
+        if count==0:                                                                    # If this is the first iteration the figure is created
+            fig, axs = plt.subplots(figsize=(len(CONF_MATRIXES)*8,8), nrows=2, ncols=len(CONF_MATRIXES))    # Create the figure with len(CONF_MATRIXES) subplots in two rows
+        if len(CONF_MATRIXES) == 1:
+            ax = axs
+        else:
+            ax = axs[count]                                                             # Makes the count'th axe the current axe
+        
+        im = ax.imshow(confMatrix, cmap="jet")                                          # Display the confusion matrix with the "jet" colormap going from blue (low values) to red (high values)
+        ax.set(xticks=np.arange(0, len(classes)), yticks=np.arange(0, len(classes)),    # Setting ax properties
+            xticklabels=classes, yticklabels=classes, title=s, 
+            xlabel="Predicted labels", ylabel="True labels")
+        
+        # Create a colorbar
+        axe = make_axes_locatable(ax)                                                   # Extracts the current axes
+        cax = axe.append_axes('right', size='5%', pad=0.05)                             # Padding with some extra space next to the axes
+        fig.colorbar(im, cax=cax, orientation='vertical')                               # Creates the colorbar
+
+        # Creates text objects on the confusion matrix, so you can see the values of the matrix in the current cell - only if the data consists of less than 15 classes, otherwise the text will be too small and unreadable
+        if np.unique(classes).shape[0] <= 15:
+            treshVal = np.max(confMatrix)/2                                             # Treshold value for the color on the text => given as half the of the maximum value in the confusion matrix
+            for row in range(confMatrix.shape[0]):                                      # Loops over all rows in the matrix
+                for col in range(confMatrix.shape[1]):                                  # Loops over all columns in the matrix
+                    ax.text(col, row, format(confMatrix[row, col], fmt),                # A matrix is indexed [rows, cols], while the cartesian coordinate system is [x, y]. That is why the coordinates in the text coordinates has been swapped.
+                    ha="center", va="center", fontSize=13,                              # Horizontal and vertical alignment of the text + center and fontsize
+                    color="black" if confMatrix[row, col] > treshVal else "white")      # If confMatrix[row, col] > treshVal the color is white, otherwise the text color is black
+        count += 1                                                                      # Increase counter
+        
+    # Returns the confusion matrix and the figure
+    return fig        
+
+
+

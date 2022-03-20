@@ -31,7 +31,7 @@ from custom_train_func import launch_custom_training                            
 from visualize_image_batch import putModelWeights, visualize_the_images             # Functions to put model_weights in the config and visualizing the image batch
 from show_learning_curves import show_history, combineDataToHistoryDictionaryFunc   # Function used to plot the learning curves for the given training and to add results to the history dictionary
 from custom_evaluation_func import evaluateResults                                  # Function to evaluate the metrics for the segmentation
-from custom_callback_functions import early_stopping, lr_scheduler, keepAllButLatestAndBestModel, computeRemainingTime, updateLogsFunc  # Callback functions for model training
+from custom_callback_functions import early_stopping, lr_scheduler, keepAllButLatestAndBestModel, computeRemainingTime, updateLogsFunc, plot_confusionMatrix  # Callback functions for model training
 from custom_pq_eval_func import pq_evaluation                                       # Used to perform the panoptic quality evaluation on the semantic segmentation results
 
 
@@ -63,7 +63,7 @@ if FLAGS.inference_only == False:
         os.remove(os.path.join(cfg.OUTPUT_DIR, "metrics.json"))                     # Remove the original metrics file
         os.rename(os.path.join(cfg.OUTPUT_DIR, "model_final.pth"),                  # Rename the model that is automatically saved after each epoch ...
             os.path.join(cfg.OUTPUT_DIR, "model_epoch_{:d}.pth".format(epoch+1)))   # ... to model_epoch_x (where x is current epoch number)
-        eval_train_results, train_loader, train_evaluator = evaluateResults(FLAGS, cfg, data_split="train", dataloader=train_loader, evaluator=train_evaluator) # Evaluate the result metrics on the training set
+        eval_train_results, train_loader, train_evaluator, conf_matrix_train = evaluateResults(FLAGS, cfg, data_split="train", dataloader=train_loader, evaluator=train_evaluator) # Evaluate the result metrics on the training set
         train_pq_results = pq_evaluation(args=FLAGS, config=cfg, data_split="train")# Evaluate the Panoptic Quality for the training semantic segmentation results
 
         # Validation period. Will 'train' with lr=0 on validation data, correct the metrics files and evaluate performance on validation data
@@ -75,7 +75,7 @@ if FLAGS.inference_only == False:
             os.path.join(cfg.OUTPUT_DIR, "val_metrics_{:d}.json".format(epoch+1)))  # ... where X is the current epoch number
         os.remove(os.path.join(cfg.OUTPUT_DIR, "metrics.json"))                     # Remove the original metrics file
         os.remove(os.path.join(cfg.OUTPUT_DIR, "model_final.pth"))                  # Remove the model that will be saved after validation
-        eval_val_results, val_loader, val_evaluator = evaluateResults(FLAGS, cfg, data_split="val", dataloader=val_loader, evaluator=val_evaluator) # Evaluate the result metrics on the training set
+        eval_val_results, val_loader, val_evaluator, conf_matrix_val = evaluateResults(FLAGS, cfg, data_split="val", dataloader=val_loader, evaluator=val_evaluator) # Evaluate the result metrics on the training set
         val_pq_results = pq_evaluation(args=FLAGS, config=cfg, data_split="val")    # Evaluate the Panoptic Quality for the validation semantic segmentation results
         
         # Prepare for the training phase of the next epoch. Switch back to training dataset, save history and learning curves and visualize segmentation results
@@ -97,8 +97,7 @@ if FLAGS.inference_only == False:
             quit_training = early_stopping(history=history, FLAGS=FLAGS)            # ... perform the early stopping callback
             if quit_training == True: break                                         # If the early stopping callback says we need to quit the training, break the for loop and stop running more epochs
         string1, string2 = computeRemainingTime(epoch=epoch, num_epochs=FLAGS.num_epochs, train_start_time=train_start_time, epoch_start_time=epoch_start_time)
-        new_best, best_epoch = updateLogsFunc(log_file=log_file, FLAGS=FLAGS, metrics_train=eval_train_results["sem_seg"], metrics_val=eval_val_results["sem_seg"],
-                                            history=history, best_val=new_best, train_start=train_start_time, epoch_start=epoch_start_time, best_epoch=best_epoch)
+        new_best, best_epoch = updateLogsFunc(log_file=log_file, FLAGS=FLAGS, history=history, best_val=new_best, train_start=train_start_time, epoch_start=epoch_start_time, best_epoch=best_epoch)
 
     # Visualize the same images, now with a trained model
     cfg = keepAllButLatestAndBestModel(cfg=cfg, history=history, FLAGS=FLAGS, bestOrLatest="best")  # Put the model weights for the best performing model on the config
@@ -108,7 +107,7 @@ if FLAGS.inference_only == False:
 # Evaluation on the vitrolife test dataset. There is no ADE20K test dataset.
 if FLAGS.debugging == False and "vitrolife" in FLAGS.dataset_name.lower():          # Inference will only be performed if we are not debugging the model and working on the vitrolife dataset
     cfg.DATASETS.TEST = ("vitrolife_dataset_test",)                                 # The inference will be done on the test dataset
-    eval_test_results,_,_ = evaluateResults(FLAGS, cfg, data_split="test")          # Evaluate the result metrics on the validation set with the best performing model
+    eval_test_results,_,_,conf_matrix_test = evaluateResults(FLAGS, cfg, data_split="test") # Evaluate the result metrics on the validation set with the best performing model
     test_pq_results = pq_evaluation(args=FLAGS, config=cfg, data_split="test")      # Evaluate the Panoptic Quality for the test semantic segmentation results
     history = combineDataToHistoryDictionaryFunc(config=cfg, eval_metrics=eval_test_results["sem_seg"], pq_metrics=test_pq_results, data_split="test", history=history)
     test_history = {}
