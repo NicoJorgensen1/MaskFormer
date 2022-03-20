@@ -83,7 +83,7 @@ def create_batch_img_ytrue_ypred(config, data_split, FLAGS, data_batch=None):
         else: dataset_dicts = DatasetCatalog.get("ade20k_sem_seg_{:s}".format(data_split))  # Else we use the ADE20K dataset
         config = putModelWeights(config)                                            # Add the newest model weights to the configuration
         if "train" in data_split: data_mapper = custom_augmentation_mapper(config=config, is_train=True)    # Use the custom data augmentation mapper for training images
-        else: data_mapper = DatasetMapper(config, is_train=False)                   # Use the regular, default mapper for val+test images
+        else: data_mapper = DatasetMapper(config, is_train=False, augmentations=[]) # Use the regular, default mapper for val+test images
         dataloader = build_detection_train_loader(dataset_dicts, mapper=data_mapper, total_batch_size=np.min([FLAGS.num_images, len(dataset_dicts)]))   # Create the dataloader
         data_batch = next(iter(dataloader))                                         # Extract the next batch from the dataloader
     img_ytrue_ypred = {"input": list(), "y_pred": list(), "y_true": list(), "PN": list()}   # Initiate a dictionary to store the input images, ground truth masks and the predicted masks
@@ -128,7 +128,7 @@ def visualize_the_images(config, FLAGS, position=[0.55, 0.08, 0.40, 0.75], epoch
     fig_list, data_batches_final = list(), list()                                   # Initiate the list to store the figures in
     if data_batches==None: data_batches = [None, None, None]                        # If no previous data has been sent, it must be a list of None's...
     data_split_count = 1
-    data_split = "train"
+    fontdict = {'fontsize': 25}                                                     # Set the font size for the plot
     for data_split, data_batch in tqdm(zip(["train", "val", "test"], data_batches), # Iterate through the three splits available
                 leave=True, unit="Data_split", total=3, ascii=True,  desc="Dataset split {:d}/{:d}".format(data_split_count, 3),
                 bar_format="{desc}  | {percentage:3.0f}% | {bar:35}| {n_fmt}/{total_fmt} [Spent: {elapsed}. Remaining: {remaining}{postfix}]"):      
@@ -141,7 +141,7 @@ def visualize_the_images(config, FLAGS, position=[0.55, 0.08, 0.40, 0.75], epoch
             data_batch = sorted(data_batch, key=lambda x: x["image_custom_info"]["PN_image"])   # ... data_batch after the number of PN per found image
             img_ytrue_ypred = sort_dictionary_by_PN(data=img_ytrue_ypred)           # And then also sort the data dictionary
         num_rows, num_cols = 3, len(data_batch)                                     # The figure will have three rows (input, y_pred, y_true) and one column per image
-        fig = plt.figure(figsize=(int(np.ceil(len(data_batch)*5.5)), 10))           # Create the figure object
+        fig = plt.figure(figsize=(int(np.ceil(len(data_batch)*4)), 12))             # Create the figure object
         row = 0                                                                     # Initiate the row index counter (all manual indexing could have been avoided by having created img_ytrue_ypred as an OrderedDict)
         for key in img_ytrue_ypred.keys():                                          # Loop through all the keys in the batch dictionary
             if key.lower() not in ['input', 'y_true', 'y_pred']: continue           # If the key is not one of (input, y_pred, y_true), we simply skip to the next one
@@ -149,16 +149,16 @@ def visualize_the_images(config, FLAGS, position=[0.55, 0.08, 0.40, 0.75], epoch
                 plt.subplot(num_rows, num_cols, row*num_cols+col+1)                 # Create the subplot instance
                 plt.axis("off")                                                     # Remove axis tickers
                 if "vitrolife" in FLAGS.dataset_name.lower():                       # If we are visualizing the vitrolife dataset
-                    plt.title("{:s} with {:.0f} PN".format(key, img_ytrue_ypred["PN"][col]))# Create the title for the plot with the number of PN
-                else: plt.title("{:s}".format(key))                                 # Otherwise simply put the key, i.e. either input, y_pred or y_true.
+                    plt.title("{:s} with {:.0f} PN".format(key, img_ytrue_ypred["PN"][col]), fontdict=fontdict) # Create the title for the plot with the number of PN
+                else: plt.title("{:s}".format(key), fontdict=fontdict)              # Otherwise simply put the key, i.e. either input, y_pred or y_true.
                 plt.imshow(img, cmap="gray")                                        # Display the image
             row += 1                                                                # Increase the row counter by 1
         try: fig = move_figure_position(fig=fig, position=position)                 # Try and move the figure to the wanted position (only possible on home computer with a display)
         except: pass                                                                # Except, simply just let the figure retain the current position
-        fig.tight_layout()                                                          # Assures the subplots are plotted tight around each other
         fig_name_init = "Segmented_{:s}_data_samples_from_".format(data_split)      # Initialize the figure name
         if epoch_num != None: fig_name = "{:s}epoch_{:d}.jpg".format(fig_name_init, epoch_num)                              # If an epoch number has been specified, the figure name will contain that
         else: fig_name = "{:s}{:s}_training.jpg".format(fig_name_init, "after" if model_done_training else "before")        # Otherwise the visualization happens before/after training
+        fig.tight_layout()                                                          # Assures the subplots are plotted tight around each other
         fig.savefig(os.path.join(get_save_dirs(config=config, dataset_split=data_split), fig_name), bbox_inches="tight")    # Save the figure in the correct output directory
         fig_list.append(fig)                                                        # Append the current figure to the list of figures
         data_batches_final.append(data_batch)                                       # Append the current data_batch to the list of data_batches
