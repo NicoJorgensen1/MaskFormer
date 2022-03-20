@@ -28,7 +28,7 @@ import numpy as np                                                              
 from time import time                                                               # Used to time the epoch/training duration
 from custom_setup_func import setup_func, zip_output, SaveHistory, printAndLog, getBestEpochResults # Assign to GPU, register vitrolife dataset, create config, zip output_dir, save history_dict, log results, get best results
 from custom_train_func import launch_custom_training                                # Function to launch the training with the given dataset
-from visualize_vitrolife_batch import putModelWeights, visualize_the_images         # Functions to put model_weights in the config and visualizing the image batch
+from visualize_image_batch import putModelWeights, visualize_the_images             # Functions to put model_weights in the config and visualizing the image batch
 from show_learning_curves import show_history, combineDataToHistoryDictionaryFunc   # Function used to plot the learning curves for the given training and to add results to the history dictionary
 from custom_evaluation_func import evaluateResults                                  # Function to evaluate the metrics for the segmentation
 from custom_callback_functions import early_stopping, lr_scheduler, keepAllButLatestAndBestModel, computeRemainingTime, updateLogsFunc  # Callback functions for model training
