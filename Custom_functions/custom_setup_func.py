@@ -51,6 +51,7 @@ def rename_output_inference_folder(config):                                 # De
     dest_folder = os.path.join(config.OUTPUT_DIR, "validation")             # The destination folder is in the same parent-directory where inference is changed with validation
     os.rename(source_folder, dest_folder)                                   # Perform the renaming of the folder
 
+# Function to zip the output folder after training has completed
 def zip_output(cfg):
     print("\nZipping the output directory {:s} with {:.0f} files".format(os.path.basename(cfg.OUTPUT_DIR), len(os.listdir(cfg.OUTPUT_DIR))))
     make_archive(base_name=os.path.basename(cfg.OUTPUT_DIR), format="zip",  # Instantiate the zipping of the output directory  where the resulting zip file will ...
@@ -72,6 +73,7 @@ def changeFLAGS(FLAGS):
     if FLAGS.min_delta < 1.0: FLAGS.min_delta *= 100                        # As the model outputs metrics multiplied by a factor of 100, the min_delta value must also be scaled accordingly
     if FLAGS.debugging: FLAGS.eval_metric.replace("val", "train")           # The metric used for evaluation will be a training metric, if we are debugging the model
     if FLAGS.use_per_pixel_baseline: FLAGS.resnet_depth = 50                # The per-pixel baseline can only be used with a ResNet depth of 50 
+    if FLAGS.use_transformer_backbone: FLAGS.learning_rate /= 50            # The learning rate must be lower when using the larger transformer backbone
     return FLAGS
 
 # Define a function to extract the final results that will be printed in the log file
@@ -101,12 +103,12 @@ parser.add_argument("--num_workers", type=int, default=4, help="Number of worker
 parser.add_argument("--max_iter", type=int, default=int(5e1), help="Maximum number of iterations to train the model for. <<Deprecated argument. Use 'num_epochs' instead>>. Default: 100000")
 parser.add_argument("--img_size_min", type=int, default=500, help="The length of the smallest size of the training images. Default: 500")
 parser.add_argument("--img_size_max", type=int, default=500, help="The length of the largest size of the training images. Default: 500")
-parser.add_argument("--resnet_depth", type=int, default=101, help="The depth of the feature extracting ResNet backbone. Possible values: [18,34,50,101] Default: 50")
-parser.add_argument("--batch_size", type=int, default=16, help="The batch size used for training the model. Default: 1")
+parser.add_argument("--resnet_depth", type=int, default=50, help="The depth of the feature extracting ResNet backbone. Possible values: [18,34,50,101] Default: 50")
+parser.add_argument("--batch_size", type=int, default=1, help="The batch size used for training the model. Default: 1")
 parser.add_argument("--num_images", type=int, default=6, help="The number of images to display/segment. Default: 6")
-parser.add_argument("--display_rate", type=int, default=75, help="The epoch_rate of how often to display image segmentations. A display_rate of 3 means that every third epoch, visual segmentations are saved. Default: 25")
+parser.add_argument("--display_rate", type=int, default=5, help="The epoch_rate of how often to display image segmentations. A display_rate of 3 means that every third epoch, visual segmentations are saved. Default: 25")
 parser.add_argument("--gpus_used", type=int, default=1, help="The number of GPU's to use for training. Only applicable for training with ADE20K. This input argument deprecates the '--num-gpus' argument. Default: 1")
-parser.add_argument("--num_epochs", type=int, default=500, help="The number of epochs to train the model for. Default: 1")
+parser.add_argument("--num_epochs", type=int, default=20, help="The number of epochs to train the model for. Default: 1")
 parser.add_argument("--patience", type=int, default=6, help="The number of epochs to accept that the model hasn't improved before lowering the learning rate by a factor '--lr_gamma'. Default: 6")
 parser.add_argument("--early_stop_patience", type=int, default=15, help="The number of epochs to accept that the model hasn't improved before terminating training. Default: 15")
 parser.add_argument("--learning_rate", type=float, default=1e-3, help="The initial learning rate used for training the model. Default: 1e-3")
@@ -128,7 +130,9 @@ FLAGS = changeFLAGS(FLAGS)
 assign_free_gpus(max_gpus=FLAGS.num_gpus)                                   # Assigning the running script to the selected amount of GPU's with the largest memory available
 if "vitrolife" in FLAGS.dataset_name.lower():                               # If we want to work with the Vitrolife dataset ...
     register_vitrolife_data_and_metadata_func(debugging=FLAGS.debugging)    # ... register the vitrolife dataset
+    FLAGS.num_queries = 25                                                  # The number of queries/regions to compute in the image should only be 25, when the dataset has a low number of classes
 else:                                                                       # Otherwise, if we are working on the ade20k dataset ...
+    FLAGS.num_queries = 25                                                  # The MaskFormer article finds the best results with 100 queries
     for split in ["train", "val"]:                                          # ... then we will find the training and the validation set
         MetadataCatalog["ade20k_sem_seg_{:s}".format(split)].num_files_in_dataset = len(DatasetCatalog["ade20k_sem_seg_{:s}".format(split)]())  # ... and create a key-value pair telling the number of files in the dataset
 

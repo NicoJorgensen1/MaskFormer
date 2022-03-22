@@ -66,12 +66,13 @@ def changeConfig_withFLAGS(cfg, FLAGS):
     cfg.DATALOADER.ASPECT_RATIO_GROUPING = False                                            # We'll simply shuffle the input data, we won't group them after aspect ratios, even though that would be more GPU efficient
     cfg.INPUT.CROP.ENABLED =  FLAGS.crop_enabled                                            # We will not allow any cropping of the input images
     cfg.MODEL.DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'                       # Assign the device on which the model should run
-    cfg.MODEL.MASK_FORMER.DICE_WEIGHT = 7                                                   # Set the weight for the dice loss (original 2)
-    cfg.MODEL.MASK_FORMER.MASK_WEIGHT = 24                                                  # Set the weight for the mask predictive loss (original 20)
+    cfg.MODEL.MASK_FORMER.DICE_WEIGHT = 10                                                  # Set the weight for the dice loss (original 2)
+    cfg.MODEL.MASK_FORMER.MASK_WEIGHT = 10                                                  # Set the weight for the mask predictive loss (original 20)
     cfg.MODEL.MASK_FORMER.DROPOUT = float(0.15)                                             # We'll set a dropout probability on 0.15 when training
     cfg.MODEL.MASK_FORMER.NO_OBJECT_WEIGHT = float(0.1)                                     # The loss weight for the "no-object" label
     cfg.MODEL.MASK_FORMER.TEST.OVERLAP_THRESHOLD = float(0.025)                             # The threshold for overlapping masks
     cfg.MODEL.MASK_FORMER.TEST.PANOPTIC_ON = False                                          # Disable the panoptic head for the maskformer 
+    cfg.MODEL.MASK_FORMER.NUM_OBJECT_QUERIES = FLAGS.num_queries                            # The number of queries to detect from the Transformer module 
     cfg.MODEL.SEM_SEG_HEAD.LOSS_WEIGHT = 1                                                  # Increase loss weight for the sem_seg_head
     cfg.TEST.EVAL_PERIOD = 0                                                                # We won't use the build in evaluation, only the custom evaluation function
     cfg.SOLVER.CHECKPOINT_PERIOD = FLAGS.epoch_iter                                         # Save a new model checkpoint after each epoch, i.e. after everytime the entire trainining set has been seen by the model

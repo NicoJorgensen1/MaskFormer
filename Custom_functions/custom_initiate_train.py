@@ -89,7 +89,7 @@ if FLAGS.inference_only == False:
     # Visualize the same images, now with a trained model
     cfg = keepAllButLatestAndBestModel(cfg=cfg, history=history, FLAGS=FLAGS, bestOrLatest="best")  # Put the model weights for the best performing model on the config
     fig_list_after, data_batches, cfg, FLAGS = visualize_the_images(                # Visualize the same images ...
-        config=cfg,FLAGS=FLAGS, data_batches=data_batches, model_done_training=True)  # ... now after the model has trained
+        config=cfg,FLAGS=FLAGS, data_batches=data_batches, model_done_training=True)    # ... now after the model has trained
 
 # Evaluation on the vitrolife test dataset. There is no ADE20K test dataset.
 if FLAGS.debugging == False and "vitrolife" in FLAGS.dataset_name.lower():          # Inference will only be performed if we are not debugging the model and working on the vitrolife dataset

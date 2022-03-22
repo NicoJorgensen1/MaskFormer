@@ -18,17 +18,19 @@ from PIL import Image
 
 # Define a function that will return a list of augmentations to use for training
 def custom_augmentation_mapper(config, is_train=True):
-    transform_list = [                                                      # Initiate the list of image data augmentations to use
-        T.Resize((500,500), Image.BILINEAR),                                # https://detectron2.readthedocs.io/en/latest/modules/data_transforms.html#detectron2.data.transforms.Resize
-        T.RandomBrightness(0.8, 1.5),                                       # https://detectron2.readthedocs.io/en/latest/modules/data_transforms.html#detectron2.data.transforms.RandomBrightness
-        T.RandomLighting(0.7),                                              # https://detectron2.readthedocs.io/en/latest/modules/data_transforms.html#detectron2.data.transforms.RandomLighting
-        T.RandomContrast(0.7, 1.3),                                         # https://detectron2.readthedocs.io/en/latest/modules/data_transforms.html#detectron2.data.transforms.RandomContrast
-        T.RandomSaturation(0.85, 1.15),                                     # https://detectron2.readthedocs.io/en/latest/modules/data_transforms.html#detectron2.data.transforms.RandomSaturation
-        T.RandomRotation(angle=[-45, 45]),                                  # https://detectron2.readthedocs.io/en/latest/modules/data_transforms.html#detectron2.data.transforms.RandomRotation
-        T.RandomFlip(prob=0.25, horizontal=True, vertical=False),           # https://detectron2.readthedocs.io/en/latest/modules/data_transforms.html#detectron2.data.transforms.RandomLighting 
-        T.RandomFlip(prob=0.25, horizontal=False, vertical=True),           # https://detectron2.readthedocs.io/en/latest/modules/data_transforms.html#detectron2.data.transforms.RandomLighting  
-        T.RandomCrop("relative", (0.75, 0.75)),                             # https://detectron2.readthedocs.io/en/latest/modules/data_transforms.html#detectron2.data.transforms.RandomCrop
-        T.Resize((500,500), Image.BILINEAR)]                                # https://detectron2.readthedocs.io/en/latest/modules/data_transforms.html#detectron2.data.transforms.Resize
+    if "val" in config.DATASETS.TRAIN[0].lower(): transform_list = []       # If we are validating the images, we won't use data augmentation
+    else:
+        transform_list = [                                                  # Initiate the list of image data augmentations to use
+            T.Resize((500,500), Image.BILINEAR),                            # https://detectron2.readthedocs.io/en/latest/modules/data_transforms.html#detectron2.data.transforms.Resize
+            T.RandomBrightness(0.8, 1.5),                                   # https://detectron2.readthedocs.io/en/latest/modules/data_transforms.html#detectron2.data.transforms.RandomBrightness
+            T.RandomLighting(0.7),                                          # https://detectron2.readthedocs.io/en/latest/modules/data_transforms.html#detectron2.data.transforms.RandomLighting
+            T.RandomContrast(0.7, 1.3),                                     # https://detectron2.readthedocs.io/en/latest/modules/data_transforms.html#detectron2.data.transforms.RandomContrast
+            T.RandomSaturation(0.85, 1.15),                                 # https://detectron2.readthedocs.io/en/latest/modules/data_transforms.html#detectron2.data.transforms.RandomSaturation
+            T.RandomRotation(angle=[-45, 45]),                              # https://detectron2.readthedocs.io/en/latest/modules/data_transforms.html#detectron2.data.transforms.RandomRotation
+            T.RandomFlip(prob=0.25, horizontal=True, vertical=False),       # https://detectron2.readthedocs.io/en/latest/modules/data_transforms.html#detectron2.data.transforms.RandomLighting 
+            T.RandomFlip(prob=0.25, horizontal=False, vertical=True),       # https://detectron2.readthedocs.io/en/latest/modules/data_transforms.html#detectron2.data.transforms.RandomLighting  
+            T.RandomCrop("relative", (0.75, 0.75)),                         # https://detectron2.readthedocs.io/en/latest/modules/data_transforms.html#detectron2.data.transforms.RandomCrop
+            T.Resize((500,500), Image.BILINEAR)]                            # https://detectron2.readthedocs.io/en/latest/modules/data_transforms.html#detectron2.data.transforms.Resize
     custom_mapper = MaskFormerSemanticDatasetMapper(config, is_train=is_train, augmentations=transform_list)    # Create the mapping from data dictionary to augmented training image
     return custom_mapper
 

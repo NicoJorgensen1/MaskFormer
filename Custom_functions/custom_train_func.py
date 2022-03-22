@@ -34,6 +34,7 @@ def run_train_func(FLAGS):
 
 # Function to launch the training
 def launch_custom_training(FLAGS, config, dataset, epoch=0, run_mode="train"):
+    [os.remove(x) for x in config.OUTPUT_DIR if "model_" in x and "epoch" not in x and x.endswith(".pth")]  # Remove all models that isn't the "model_epoch_X" model...
     FLAGS.config = config                                                                                   # Save the config on the FLAGS argument
     config = putModelWeights(config)                                                                        # Assign the latest saved model to the config
     if "val" in run_mode.lower(): config.SOLVER.BASE_LR = float(0)                                          # If we are on the validation split set the learning rate to 0
