@@ -6,7 +6,6 @@ import numpy as np
 from detectron2.data import DatasetCatalog, DatasetMapper, build_detection_train_loader
 from detectron2.evaluation import SemSegEvaluator
 from detectron2.engine.defaults import DefaultPredictor
-from custom_goto_trainer_class import My_GoTo_Trainer
 from tqdm import tqdm
 
 
@@ -26,7 +25,7 @@ class My_Evaluator(SemSegEvaluator):
             output = output["sem_seg"].argmax(dim=0).to(self._cpu_device)
             pred = np.array(output, dtype=np.int)
             gt = np.asarray(gt.numpy()).astype(np.uint8)
-            gt[gt == self._ignore_label] = self._num_classes
+            gt[gt == self._ignore_label] = self._num_classes                                                # All pixels in the "ignore_label" class will be set to the "auxillary" class
             self._conf_matrix += np.bincount((self._num_classes + 1) * pred.reshape(-1) + gt.reshape(-1),   # 
                 minlength=self._conf_matrix.size,).reshape(self._conf_matrix.shape)                         #
             self._predictions.extend(self.encode_json_sem_seg(pred, input["file_name"]))                    # 
@@ -43,7 +42,7 @@ def evaluateResults(FLAGS, cfg, data_split="train",  dataloader=None, evaluator=
     # Build the dataloader if no dataloader has been sent to the function as an input
     if dataloader == None:                                                                                  # If no dataloader has been inputted to the function ...
         dataloader = iter(build_detection_train_loader(DatasetCatalog.get(dataset_name),                    # ... create the dataloader for evaluation ...
-            mapper=DatasetMapper(cfg, is_train=False, augmentations=[]), total_batch_size=1, num_workers=1))    # ... with batch_size = 1 and no augmentation on the mapper
+            mapper=DatasetMapper(cfg, is_train=False, augmentations=[]), total_batch_size=1, num_workers=2))    # ... with batch_size = 1 and no augmentation on the mapper
     
     # Create the predictor and evaluator instances
     predictor = DefaultPredictor(cfg=cfg)
@@ -52,8 +51,8 @@ def evaluateResults(FLAGS, cfg, data_split="train",  dataloader=None, evaluator=
 
     # Create a progress bar to keep track on the evaluation
     with tqdm(total=dataset_num_files, iterable=None, postfix="Evaluating the {:s} dataset".format(data_split), unit="img",  
-    file=sys.stdout, desc="Image {:d}/{:d}".format(1, dataset_num_files), colour="green", leave=True, ascii=True, 
-    bar_format="{desc}  | {percentage:3.0f}% | {bar:35}| {n_fmt}/{total_fmt} | [Spent: {elapsed}. Remaining: {remaining} | {postfix}]") as tepoch:     
+            file=sys.stdout, desc="Image {:d}/{:d}".format(1, dataset_num_files), colour="green", leave=True, ascii=True, 
+            bar_format="{desc}  | {percentage:3.0f}% | {bar:35}| {n_fmt}/{total_fmt} | [Spent: {elapsed}. Remaining: {remaining} | {postfix}]") as tepoch:     
         
         # Predict all the files in the dataset
         for kk, data_batch in enumerate(dataloader):                                                        # Iterate through all batches in the dataloader
@@ -73,3 +72,4 @@ def evaluateResults(FLAGS, cfg, data_split="train",  dataloader=None, evaluator=
 
     # Return the results
     return eval_metrics_results, dataloader, evaluator, evaluator._conf_matrix                              # Return the evaluation metrics, the dataloader, the evaluator and the confusion matrix
+

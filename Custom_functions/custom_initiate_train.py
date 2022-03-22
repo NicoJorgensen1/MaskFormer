@@ -58,20 +58,21 @@ if FLAGS.inference_only == False:
     for epoch in range(FLAGS.num_epochs):                                           # Iterate over the chosen amount of epochs
         # Training period. Will train the model, correct the metrics files and evaluate performance on the training data
         epoch_start_time = time()                                                   # Now this new epoch starts
-        trainer_class = launch_custom_training(FLAGS=FLAGS, config=cfg)             # Launch the training loop for one epoch
+        train_trainer = launch_custom_training(FLAGS=FLAGS, config=cfg)             # Launch the training loop for one epoch
         shutil.copyfile(os.path.join(cfg.OUTPUT_DIR, "metrics.json"),               # Rename the metrics.json to train_metricsX.json ...
             os.path.join(cfg.OUTPUT_DIR, "train_metrics_{:d}.json".format(epoch+1)))# ... where X is the current epoch number
         os.remove(os.path.join(cfg.OUTPUT_DIR, "metrics.json"))                     # Remove the original metrics file
         os.rename(os.path.join(cfg.OUTPUT_DIR, "model_final.pth"),                  # Rename the model that is automatically saved after each epoch ...
             os.path.join(cfg.OUTPUT_DIR, "model_epoch_{:d}.pth".format(epoch+1)))   # ... to model_epoch_x (where x is current epoch number)
+        [os.remove(x) for x in cfg.OUTPUT_DIR if "model_" in x and "epoch" not in x and x.endswith(".pth")] # Remove all models that isn't the "model_epoch_X" model...
+        cfg = putModelWeights(cfg)                                                  # Assign the newly saved model to the config
         eval_train_results, train_loader, train_evaluator, conf_matrix_train = evaluateResults(FLAGS, cfg, data_split="train", dataloader=train_loader, evaluator=train_evaluator) # Evaluate the result metrics on the training set
         train_pq_results = pq_evaluation(args=FLAGS, config=cfg, data_split="train")# Evaluate the Panoptic Quality for the training semantic segmentation results
 
         # Validation period. Will 'train' with lr=0 on validation data, correct the metrics files and evaluate performance on validation data
-        cfg = putModelWeights(cfg)                                                  # Assign the latest model weights to the config
         cfg.DATASETS.TRAIN = val_dataset                                            # Change the 'train_dataset' variable to the validation dataset ...
         cfg.SOLVER.BASE_LR = float(0)                                               # Set the learning rate to 0
-        validator_class = launch_custom_training(FLAGS=FLAGS, config=cfg)           # ... and then "train" the model, i.e. compute losses, wi
+        validator_trainer = launch_custom_training(FLAGS=FLAGS, config=cfg)         # ... and then "train" the model, i.e. compute losses, wi
         shutil.copyfile(os.path.join(cfg.OUTPUT_DIR, "metrics.json"),               # Rename the metrics.json to val_metricsX.json ...
             os.path.join(cfg.OUTPUT_DIR, "val_metrics_{:d}.json".format(epoch+1)))  # ... where X is the current epoch number
         os.remove(os.path.join(cfg.OUTPUT_DIR, "metrics.json"))                     # Remove the original metrics file

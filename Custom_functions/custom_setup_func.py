@@ -71,6 +71,7 @@ def changeFLAGS(FLAGS):
     if FLAGS.eval_only != FLAGS.inference_only: FLAGS.eval_only = FLAGS.inference_only  # As there are two inputs where "eval_only" can be set, inference_only is the superior
     if FLAGS.min_delta < 1.0: FLAGS.min_delta *= 100                        # As the model outputs metrics multiplied by a factor of 100, the min_delta value must also be scaled accordingly
     if FLAGS.debugging: FLAGS.eval_metric.replace("val", "train")           # The metric used for evaluation will be a training metric, if we are debugging the model
+    if FLAGS.use_per_pixel_baseline: FLAGS.resnet_depth = 50                # The per-pixel baseline can only be used with a ResNet depth of 50 
     return FLAGS
 
 # Define a function to extract the final results that will be printed in the log file
