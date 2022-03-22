@@ -26,18 +26,18 @@ def pickSamplesWithUniquePN(dataset_dict):
 
 # Define the function to return the list of dictionaries with information regarding all images available in the vitrolife dataset
 def vitrolife_dataset_function(run_mode="train", debugging=False):
-    # Find the folder containing the vitrolife dataset
-    vitrolife_dataset_filepath = os.path.join(os.getenv("DETECTRON2_DATASETS"), "Vitrolife_dataset")
+    # Find the folder containing the vitrolife dataset  
+    vitrolife_dataset_filepath = os.path.join(os.getenv("DETECTRON2_DATASETS"), "Vitrolife_dataset")    # Get the path to the vitrolife dataset
     
     # Find the metadata file
-    metadata_file = os.path.join(vitrolife_dataset_filepath, "metadata.csv")
-    df_data = pd.read_csv(metadata_file)
-    df_data = df_data.set_index(["HashKey","Well"])
+    metadata_file = os.path.join(vitrolife_dataset_filepath, "metadata.csv")                # Get the csv file with the metadata for all images
+    df_data = pd.read_csv(metadata_file)                                                    # Read the csv file 
+    df_data = df_data.set_index(["HashKey","Well"])                                         # Set the two columns HashKey and Well as index columns
 
     # Create the list of dictionaries with information about all images
     img_mask_pair_list = []                                                                 # Initiate the list to store the information about all images
-    total_files = len(os.listdir(os.path.join(vitrolife_dataset_filepath, "raw_images")))
-    iteration_counter = 0
+    total_files = len(os.listdir(os.path.join(vitrolife_dataset_filepath, "raw_images")))   # List all the image files in the raw_images directory
+    iteration_counter = 0                                                                   # Initiate a iteration counter 
     count = 0                                                                               # Initiate a counter to count the number of images inserted to the dataset
     for img_filename in tqdm(os.listdir(os.path.join(vitrolife_dataset_filepath, "raw_images")),    # Loop through all files in the raw_images folder
             total=total_files, unit="img", postfix="Read the Vitrolife {:s} dataset dictionaries".format(run_mode), leave=True,
@@ -76,18 +76,18 @@ def vitrolife_dataset_function(run_mode="train", debugging=False):
 
 # Function to register the dataset and the meta dataset for each of the three splitshuffleshuffles, [train, val, test]
 def register_vitrolife_data_and_metadata_func(debugging=False):
-    class_labels = ["Background", "Well", "Zona", "Perivitelline space", "Cell", "PN"]
-    stuff_id = {ii: ii for ii in range(len(class_labels))}
-    stuff_colors = [(0,0,0), (255,0,0), (0,255,0), (0,0,255), (255,255,0), (0,255,255)]
-    for split_mode in ["train", "val", "test"]:
-        DatasetCatalog.register("vitrolife_dataset_{:s}".format(split_mode), lambda split_mode=split_mode: vitrolife_dataset_function(run_mode=split_mode, debugging=debugging))
-        MetadataCatalog.get("vitrolife_dataset_{:s}".format(split_mode)).set(stuff_classes=class_labels,
-                                                                            stuff_colors = stuff_colors,
-                                                                            stuff_dataset_id_to_contiguous_id = stuff_id,
-                                                                            # ignore_label=0,                         # The model won't be rewarded by predicting background pixels
-                                                                            ignore_label=255,                       # No labels will be ignored...
-                                                                            evaluator_type="sem_seg",
-                                                                            num_files_in_dataset=len(DatasetCatalog["vitrolife_dataset_{:}".format(split_mode)]()))
+    class_labels = ["Background", "Well", "Zona", "Perivitelline space", "Cell", "PN"]      # Write the class labels
+    stuff_id = {ii: ii for ii in range(len(class_labels))}                                  # Create a dictionary with the class_id's as both keys and values
+    stuff_colors = [(0,0,0), (255,0,0), (0,255,0), (0,0,255), (255,255,0), (0,255,255)]     # Set random colors for when the images will be visualized
+    for split_mode in ["train", "val", "test"]:                                             # Iterate over the three dataset splits ... 
+        DatasetCatalog.register("vitrolife_dataset_{:s}".format(split_mode), lambda split_mode=split_mode: vitrolife_dataset_function(run_mode=split_mode, debugging=debugging))    # Register the dataset
+        MetadataCatalog.get("vitrolife_dataset_{:s}".format(split_mode)).set(stuff_classes=class_labels,                    # Set the metadata stuff_class names
+                                                                            stuff_colors = stuff_colors,                    # Set the metadata stuff_colors for visualization
+                                                                            stuff_dataset_id_to_contiguous_id = stuff_id,   # Set the metadata class indices
+                                                                            # ignore_label=0,                               # The model won't be rewarded by predicting background pixels
+                                                                            ignore_label=255,                               # No labels will be ignored as 255 >> num_classes ...
+                                                                            evaluator_type="sem_seg",                       # Choose the type of evaluator for this dataset
+                                                                            num_files_in_dataset=len(DatasetCatalog["vitrolife_dataset_{:}".format(split_mode)]())) # Write the length of the dataset
     assert any(["vitrolife" in x for x in list(MetadataCatalog)]), "Datasets have not been registered correctly"    # Assuring the dataset has been registered correctly
 
 # Test that the function will actually return a list of dicts

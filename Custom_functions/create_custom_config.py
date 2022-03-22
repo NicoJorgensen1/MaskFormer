@@ -35,12 +35,12 @@ def createVitrolifeConfiguration(FLAGS):
         if FLAGS.use_checkpoint==True:                                                      # If the user choose to start training from a earlier checkpoint ...
             cfg.MODEL.WEIGHTS = os.path.join(checkpoint_dir, "maskformer_swin_small_checkpoint.pkl")    # Load the swin_transformer checkpoint
     elif FLAGS.use_transformer_backbone==False and FLAGS.use_per_pixel_baseline==False:     # Else-if the user will use regular ResNet backbone ...
-        cfg.merge_from_file(os.path.join(config_folder, "maskformer_R50_bs16_160k.yaml"))   # ... merge with the ResNet_maskformer config
+        cfg.merge_from_file(os.path.join(config_folder, "maskformer_R"+"{:d}".format(FLAGS.resnet_depth)+"_bs16_160k.yaml"))  # ... merge with the ResNet_maskformer config
         cfg.MODEL.RESNETS.DEPTH = FLAGS.resnet_depth                                        # Assign the depth of the ResNet backbone feature extracting model
         if FLAGS.use_checkpoint==True:                                                      # If the user choose to start training from a earlier checkpoint ...
             cfg.MODEL.WEIGHTS = os.path.join(checkpoint_dir, "maskformer_resnet_backbone_checkpoint.pkl")   # Load the resnet_backbone checkpoint
     elif FLAGS.use_per_pixel_baseline==True:                                                # Otherwise, then the user chose to work with the per_pixel_calculating baselines, so ...
-        cfg.merge_from_file(os.path.join(config_folder, "per_pixel_baseline_R50_bs16_160k.yaml")) # ... merge with the per_pixel_baseline config
+        cfg.merge_from_file(os.path.join(config_folder, "per_pixel_baseline_R"+"{:d}".format(FLAGS.resnet_depth)+"_bs16_160k.yaml"))  # ... merge with the per_pixel_baseline config
         if FLAGS.use_checkpoint==True:                                                      # If the user choose to start training from a earlier checkpoint ...
             cfg.MODEL.WEIGHTS = os.path.join(checkpoint_dir, "maskformer_per_pixel_baseline_checkpoint.pkl")    # Load the per_pixel classification checkpoint
     cfg.merge_from_file(os.path.join(config_folder, "Base-ADE20K-150.yaml"))                # Merge with the base config for ade20K dataset. This is the config selecting that we use the ADE20K dataset
@@ -59,14 +59,16 @@ def changeConfig_withFLAGS(cfg, FLAGS):
     cfg.SOLVER.LR_SCHEDULER_NAME = "WarmupMultiStepLR"                                      # Default learning rate scheduler
     cfg.SOLVER.NESTEROV = True                                                              # Whether or not the learning algorithm will use Nesterow momentum
     cfg.SOLVER.WEIGHT_DECAY = float(3e-3)                                                   # A small lambda value for the weight decay
+    cfg.SOLVER.CLIP_GRADIENTS.ENABLED = False                                               # We won't clip the gradients at any point
     cfg.TEST.AUG = False                                                                    # No augmentation used for inference
     cfg.MODEL.PANOPTIC_FPN.COMBINE.ENABLED = False                                          # Disable the panoptic head during inference
     cfg.DATALOADER.NUM_WORKERS = FLAGS.num_workers                                          # Set the number of workers to only 2
+    cfg.DATALOADER.ASPECT_RATIO_GROUPING = False                                            # We'll simply shuffle the input data, we won't group them after aspect ratios, even though that would be more GPU efficient
     cfg.INPUT.CROP.ENABLED =  FLAGS.crop_enabled                                            # We will not allow any cropping of the input images
     cfg.MODEL.DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'                       # Assign the device on which the model should run
     cfg.MODEL.MASK_FORMER.DICE_WEIGHT = 8                                                   # Set the weight for the dice loss (original 2)
     cfg.MODEL.MASK_FORMER.MASK_WEIGHT = 24                                                  # Set the weight for the mask predictive loss (original 20)
-    cfg.MODEL.MASK_FORMER.DROPOUT = float(0.35)                                             # We'll set a dropout probability on 0.3 when training
+    cfg.MODEL.MASK_FORMER.DROPOUT = float(0.15)                                             # We'll set a dropout probability on 0.15 when training
     cfg.MODEL.MASK_FORMER.NO_OBJECT_WEIGHT = float(0.1)                                     # The loss weight for the "no-object" label
     cfg.MODEL.MASK_FORMER.TEST.OVERLAP_THRESHOLD = float(0.025)                             # The threshold for overlapping masks
     cfg.MODEL.MASK_FORMER.TEST.PANOPTIC_ON = False                                          # Disable the panoptic head for the maskformer 
