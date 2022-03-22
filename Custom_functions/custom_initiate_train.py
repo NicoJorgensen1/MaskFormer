@@ -28,7 +28,7 @@ import numpy as np                                                              
 from time import time                                                               # Used to time the epoch/training duration
 from custom_setup_func import setup_func, zip_output, SaveHistory, printAndLog, getBestEpochResults # Assign to GPU, register vitrolife dataset, create config, zip output_dir, save history_dict, log results, get best results
 from custom_train_func import launch_custom_training                                # Function to launch the training with the given dataset
-from visualize_image_batch import putModelWeights, visualize_the_images             # Functions to put model_weights in the config and visualizing the image batch
+from visualize_image_batch import visualize_the_images                              # Functions visualize the image batch
 from show_learning_curves import show_history, combineDataToHistoryDictionaryFunc   # Function used to plot the learning curves for the given training and to add results to the history dictionary
 from custom_evaluation_func import evaluateResults                                  # Function to evaluate the metrics for the segmentation
 from custom_callback_functions import early_stopping, lr_scheduler, keepAllButLatestAndBestModel, computeRemainingTime, updateLogsFunc  # Callback functions for model training
@@ -46,7 +46,6 @@ new_best = np.inf if train_mode=="min" else -np.inf                             
 best_epoch = 0                                                                      # Initiate the best epoch as being epoch_0, i.e. before doing any model training
 train_dataset = cfg.DATASETS.TRAIN                                                  # Get the training dataset name
 val_dataset = cfg.DATASETS.TEST                                                     # Get the validation dataset name
-base_lr = FLAGS.learning_rate                                                       # Get the initial learning rate. Used for the lr_scheduler callback.
 lr_update_check = np.zeros((FLAGS.patience, 1), dtype=bool)                         # Preallocating array to determine whether or not the learning rate was updated
 
 # Visualize some random images
@@ -58,30 +57,16 @@ if FLAGS.inference_only == False:
     for epoch in range(FLAGS.num_epochs):                                           # Iterate over the chosen amount of epochs
         # Training period. Will train the model, correct the metrics files and evaluate performance on the training data
         epoch_start_time = time()                                                   # Now this new epoch starts
-        train_trainer = launch_custom_training(FLAGS=FLAGS, config=cfg)             # Launch the training loop for one epoch
-        shutil.copyfile(os.path.join(cfg.OUTPUT_DIR, "metrics.json"),               # Rename the metrics.json to train_metricsX.json ...
-            os.path.join(cfg.OUTPUT_DIR, "train_metrics_{:d}.json".format(epoch+1)))# ... where X is the current epoch number
-        os.remove(os.path.join(cfg.OUTPUT_DIR, "metrics.json"))                     # Remove the original metrics file
-        os.rename(os.path.join(cfg.OUTPUT_DIR, "model_final.pth"),                  # Rename the model that is automatically saved after each epoch ...
-            os.path.join(cfg.OUTPUT_DIR, "model_epoch_{:d}.pth".format(epoch+1)))   # ... to model_epoch_x (where x is current epoch number)
-        [os.remove(x) for x in cfg.OUTPUT_DIR if "model_" in x and "epoch" not in x and x.endswith(".pth")] # Remove all models that isn't the "model_epoch_X" model...
-        cfg = putModelWeights(cfg)                                                  # Assign the newly saved model to the config
+        cfg = launch_custom_training(FLAGS=FLAGS, config=cfg, dataset=train_dataset, epoch=epoch, run_mode="train")  # Launch the training loop for one epoch
         eval_train_results, train_loader, train_evaluator, conf_matrix_train = evaluateResults(FLAGS, cfg, data_split="train", dataloader=train_loader, evaluator=train_evaluator) # Evaluate the result metrics on the training set
         train_pq_results = pq_evaluation(args=FLAGS, config=cfg, data_split="train")# Evaluate the Panoptic Quality for the training semantic segmentation results
 
         # Validation period. Will 'train' with lr=0 on validation data, correct the metrics files and evaluate performance on validation data
-        cfg.DATASETS.TRAIN = val_dataset                                            # Change the 'train_dataset' variable to the validation dataset ...
-        cfg.SOLVER.BASE_LR = float(0)                                               # Set the learning rate to 0
-        validator_trainer = launch_custom_training(FLAGS=FLAGS, config=cfg)         # ... and then "train" the model, i.e. compute losses, wi
-        shutil.copyfile(os.path.join(cfg.OUTPUT_DIR, "metrics.json"),               # Rename the metrics.json to val_metricsX.json ...
-            os.path.join(cfg.OUTPUT_DIR, "val_metrics_{:d}.json".format(epoch+1)))  # ... where X is the current epoch number
-        os.remove(os.path.join(cfg.OUTPUT_DIR, "metrics.json"))                     # Remove the original metrics file
-        os.remove(os.path.join(cfg.OUTPUT_DIR, "model_final.pth"))                  # Remove the model that will be saved after validation
+        cfg = launch_custom_training(FLAGS=FLAGS, config=cfg, dataset=val_dataset, epoch=epoch, run_mode="val")  # Launch the training loop for one epoch
         eval_val_results, val_loader, val_evaluator, conf_matrix_val = evaluateResults(FLAGS, cfg, data_split="val", dataloader=val_loader, evaluator=val_evaluator) # Evaluate the result metrics on the training set
         val_pq_results = pq_evaluation(args=FLAGS, config=cfg, data_split="val")    # Evaluate the Panoptic Quality for the validation semantic segmentation results
         
         # Prepare for the training phase of the next epoch. Switch back to training dataset, save history and learning curves and visualize segmentation results
-        cfg.DATASETS.TRAIN = train_dataset                                          # Set the 'dataset_train' variable back to the training data
         history = show_history(config=cfg, FLAGS=FLAGS, metrics_train=eval_train_results["sem_seg"],    # Create and save the learning curves ...
             metrics_eval=eval_val_results["sem_seg"], history=history, pq_train=train_pq_results, pq_val=val_pq_results)    # ... including all training and validation metrics
         SaveHistory(historyObject=history, save_folder=cfg.OUTPUT_DIR)              # Save the history dictionary after each epoch
@@ -93,9 +78,8 @@ if FLAGS.inference_only == False:
         # Performing callbacks
         cfg = keepAllButLatestAndBestModel(cfg=cfg, history=history, FLAGS=FLAGS)   # Keep only the best and the latest model weights. The rest are deleted.
         if epoch+1 >= FLAGS.patience:                                               # If the model has trained for more than 'patience' epochs and we aren't debugging ...
-            cfg, lr_update_check = lr_scheduler(cfg=cfg, history=history, FLAGS=FLAGS, learn_rate=base_lr, lr_updated=lr_update_check)  # ... change the learning rate, if needed
-            base_lr = cfg.SOLVER.BASE_LR                                            # Save a new value for the base_lr variable
-        cfg.SOLVER.BASE_LR = base_lr                                                # Assign the base_lr to the config again
+            cfg, lr_update_check = lr_scheduler(cfg=cfg, history=history, FLAGS=FLAGS, lr_updated=lr_update_check)  # ... change the learning rate, if needed
+            FLAGS.learning_rate = cfg.SOLVER.BASE_LR                                # Update the FLAGS.learning_rate value
         if epoch+1 >= FLAGS.early_stop_patience:                                    # If the model has trained for more than 'early_stopping_patience' epochs ...
             quit_training = early_stopping(history=history, FLAGS=FLAGS)            # ... perform the early stopping callback
             if quit_training == True: break                                         # If the early stopping callback says we need to quit the training, break the for loop and stop running more epochs
@@ -121,10 +105,10 @@ if FLAGS.debugging == False and "vitrolife" in FLAGS.dataset_name.lower():      
 
 # Print and log the best metric results
 printAndLog(input_to_write="Final results:".upper(), logs=log_file)
-printAndLog(input_to_write="Best validation results:".ljust(25)+"Epoch {:d}:".format(best_epoch).ljust(12), logs=log_file)
+printAndLog(input_to_write="Best validation results:".ljust(30)+"Epoch {:d}: {:s} = {:.3f}\n{:s}".format(best_epoch, FLAGS.eval_metric, new_best, "All best validation results:".upper().ljust(30)), logs=log_file)
 printAndLog(input_to_write=getBestEpochResults(history, best_epoch), logs=log_file, prefix="")
 if "test" in cfg.DATASETS.TEST[0]:
-    printAndLog(input_to_write="Test results: ", logs=log_file)
+    printAndLog(input_to_write="All test results:".upper().ljust(30), logs=log_file)
     printAndLog(input_to_write=test_history, logs=log_file, prefix="")
 
 # Remove all metrics.json files, the default log-file and zip the resulting output directory
