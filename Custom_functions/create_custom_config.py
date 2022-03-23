@@ -57,18 +57,19 @@ def changeConfig_withFLAGS(cfg, FLAGS):
     cfg.SOLVER.IMS_PER_BATCH = FLAGS.batch_size                                             # Batch size used when training => batch_size pr GPU = batch_size // num_gpus
     cfg.SOLVER.MAX_ITER = FLAGS.epoch_iter                                                  # <<< Deprecated input argument: Use --num_epochs instead >>>
     cfg.SOLVER.LR_SCHEDULER_NAME = "WarmupMultiStepLR"                                      # Default learning rate scheduler
+    cfg.SOLVER.OPTIMIZER = FLAGS.optimizer_used                                             # The optimizer to use for training the model
     cfg.SOLVER.NESTEROV = True                                                              # Whether or not the learning algorithm will use Nesterow momentum
     cfg.SOLVER.WEIGHT_DECAY = float(1e-3)                                                   # A small lambda value for the weight decay
     cfg.SOLVER.CLIP_GRADIENTS.ENABLED = False                                               # We won't clip the gradients at any point
-    cfg.SOLVER.BACKBONE_MULTIPLIER = 3
+    cfg.SOLVER.BACKBONE_MULTIPLIER = FLAGS.backbone_multiplier                              # Backbone learning rate = learning_rate * backbone_multiplier
     cfg.TEST.AUG = False                                                                    # No augmentation used for inference
     cfg.MODEL.PANOPTIC_FPN.COMBINE.ENABLED = False                                          # Disable the panoptic head during inference
     cfg.DATALOADER.NUM_WORKERS = FLAGS.num_workers                                          # Set the number of workers to only 2
     cfg.DATALOADER.ASPECT_RATIO_GROUPING = False                                            # We'll simply shuffle the input data, we won't group them after aspect ratios, even though that would be more GPU efficient
     cfg.INPUT.CROP.ENABLED =  FLAGS.crop_enabled                                            # We will not allow any cropping of the input images
     cfg.MODEL.DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'                       # Assign the device on which the model should run
-    cfg.MODEL.MASK_FORMER.DICE_WEIGHT = 20                                                  # Set the weight for the dice loss (original 2)
-    cfg.MODEL.MASK_FORMER.MASK_WEIGHT = 20                                                  # Set the weight for the mask predictive loss (original 20)
+    cfg.MODEL.MASK_FORMER.DICE_WEIGHT = FLAGS.dice_loss_weight                              # Set the weight for the dice loss (original 2)
+    cfg.MODEL.MASK_FORMER.MASK_WEIGHT = FLAGS.mask_loss_weight                              # Set the weight for the mask predictive loss (original 20)
     cfg.MODEL.MASK_FORMER.DROPOUT = float(0.15)                                             # We'll set a dropout probability on 0.15 when training
     cfg.MODEL.MASK_FORMER.NO_OBJECT_WEIGHT = float(0.1)                                     # The loss weight for the "no-object" label
     cfg.MODEL.MASK_FORMER.TEST.OVERLAP_THRESHOLD = float(0.025)                             # The threshold for overlapping masks
