@@ -66,7 +66,7 @@ def changeConfig_withFLAGS(cfg, FLAGS):
     cfg.DATALOADER.ASPECT_RATIO_GROUPING = False                                            # We'll simply shuffle the input data, we won't group them after aspect ratios, even though that would be more GPU efficient
     cfg.INPUT.CROP.ENABLED =  FLAGS.crop_enabled                                            # We will not allow any cropping of the input images
     cfg.MODEL.DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'                       # Assign the device on which the model should run
-    cfg.MODEL.MASK_FORMER.DICE_WEIGHT = 10                                                  # Set the weight for the dice loss (original 2)
+    cfg.MODEL.MASK_FORMER.DICE_WEIGHT = 50                                                  # Set the weight for the dice loss (original 2)
     cfg.MODEL.MASK_FORMER.MASK_WEIGHT = 10                                                  # Set the weight for the mask predictive loss (original 20)
     cfg.MODEL.MASK_FORMER.DROPOUT = float(0.15)                                             # We'll set a dropout probability on 0.15 when training
     cfg.MODEL.MASK_FORMER.NO_OBJECT_WEIGHT = float(0.1)                                     # The loss weight for the "no-object" label
