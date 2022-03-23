@@ -68,7 +68,7 @@ def changeConfig_withFLAGS(cfg, FLAGS):
     cfg.INPUT.CROP.ENABLED =  FLAGS.crop_enabled                                            # We will not allow any cropping of the input images
     cfg.MODEL.DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'                       # Assign the device on which the model should run
     cfg.MODEL.MASK_FORMER.DICE_WEIGHT = 100                                                 # Set the weight for the dice loss (original 2)
-    cfg.MODEL.MASK_FORMER.MASK_WEIGHT = 10                                                  # Set the weight for the mask predictive loss (original 20)
+    cfg.MODEL.MASK_FORMER.MASK_WEIGHT = 30                                                  # Set the weight for the mask predictive loss (original 20)
     cfg.MODEL.MASK_FORMER.DROPOUT = float(0.15)                                             # We'll set a dropout probability on 0.15 when training
     cfg.MODEL.MASK_FORMER.NO_OBJECT_WEIGHT = float(0.1)                                     # The loss weight for the "no-object" label
     cfg.MODEL.MASK_FORMER.TEST.OVERLAP_THRESHOLD = float(0.025)                             # The threshold for overlapping masks
@@ -100,7 +100,7 @@ def changeConfig_withFLAGS(cfg, FLAGS):
     
     
     # cfg.SOLVER.WEIGHT_DECAY = float(0)
-    cfg.INPUT.FORMAT = "RGB"
+    # cfg.INPUT.FORMAT = "RGB"
 
 
 
