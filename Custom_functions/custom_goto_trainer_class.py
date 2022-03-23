@@ -50,7 +50,7 @@ class My_GoTo_Trainer(DefaultTrainer):
 
     @classmethod
     def build_lr_scheduler(cls, cfg, optimizer):
-        return build_lr_scheduler(cfg, optimizer)
+        return None #build_lr_scheduler(cfg, optimizer)
     
     @classmethod
     def build_optimizer(cls, cfg, model):
@@ -155,10 +155,8 @@ class My_GoTo_Trainer(DefaultTrainer):
             else None,
         ]
 
-        # Do PreciseBN before checkpointer, because it updates the model and need to
-        # be saved by checkpointer.
-        # This is not always the best: if checkpointing has a different frequency,
-        # some checkpoints may have more precise statistics than others.
+        # Do PreciseBN before checkpointer, because it updates the model and need to be saved by checkpointer.
+        # This is not always the best: if checkpointing has a different frequency, some checkpoints may have more precise statistics than others.
         if comm.is_main_process():
             ret.append(hooks.PeriodicCheckpointer(self.checkpointer, cfg.SOLVER.CHECKPOINT_PERIOD))
 
