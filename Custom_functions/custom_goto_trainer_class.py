@@ -50,7 +50,7 @@ class My_GoTo_Trainer(DefaultTrainer):
 
     @classmethod
     def build_lr_scheduler(cls, cfg, optimizer):
-        return None #build_lr_scheduler(cfg, optimizer)
+        return build_lr_scheduler(cfg, optimizer)
     
     @classmethod
     def build_optimizer(cls, cfg, model):
