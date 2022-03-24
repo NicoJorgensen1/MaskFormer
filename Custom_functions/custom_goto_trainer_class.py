@@ -2,18 +2,26 @@ import itertools
 import os
 import torch
 import numpy as np
+import weakref
+import logging
 from copy import copy
 from detectron2.utils import comm
 from typing import Any, Dict, List, Set
 from detectron2.data import build_detection_train_loader, MetadataCatalog
 from detectron2.data.samplers.distributed_sampler import TrainingSampler
 from detectron2.engine import DefaultTrainer, hooks
+from detectron2.engine.hooks import PeriodicWriter
+from detectron2.engine.train_loop import SimpleTrainer
+from detectron2.utils.events import EventWriter
+from detectron2.utils.logger import setup_logger
+from detectron2.checkpoint import DetectionCheckpointer
+from detectron2.utils.file_io import PathManager
+from detectron2.engine.defaults import create_ddp_model
 from detectron2.projects.deeplab import build_lr_scheduler
 from detectron2.solver.build import maybe_add_gradient_clipping
 from detectron2.data import transforms as T
 from mask_former import MaskFormerSemanticDatasetMapper
 from fvcore.nn.precise_bn import get_bn_modules
-from torchvision import transforms as T2
 from PIL import Image
 
 # Define a function that will return a list of augmentations to use for training
@@ -37,6 +45,40 @@ def custom_augmentation_mapper(config, is_train=True):
 
 # Custom Trainer class build on the DefaultTrainer class. This is mostly copied from the train_net.py
 class My_GoTo_Trainer(DefaultTrainer):
+    def __init__(self, cfg):
+        """
+        Args:
+            cfg (CfgNode):
+        """
+        super().__init__(cfg)
+        logger = logging.getLogger("detectron2")
+        if not logger.isEnabledFor(logging.INFO):  # setup_logger is not called for d2
+            setup_logger()
+        cfg = DefaultTrainer.auto_scale_workers(cfg, comm.get_world_size())
+
+        # Assume these objects must be constructed in this order.
+        model = self.build_model(cfg)
+        optimizer = self.build_optimizer(cfg, model)
+        data_loader = self.build_train_loader(cfg)
+
+        model = create_ddp_model(model, broadcast_buffers=False)
+        self._trainer = SimpleTrainer(model, data_loader, optimizer)
+
+        self.scheduler = self.build_lr_scheduler(cfg, optimizer)
+        self.checkpointer = DetectionCheckpointer(
+            # Assume you want to save checkpoints together with logs/statistics
+            model,
+            cfg.OUTPUT_DIR,
+            save_to_disk = "train" in cfg.DATASETS.TRAIN[0],                # We'll only save a model if we are training, not during validation
+            trainer=weakref.proxy(self),
+        )
+        self.start_iter = 0
+        self.max_iter = cfg.SOLVER.MAX_ITER
+        self.cfg = cfg
+
+        self.register_hooks(self.build_hooks())
+
+
     # We'll only use the custom evaluation, not any build-in method...
     @classmethod
     def build_evaluator(cls, cfg, dataset_name, output_folder=None):
@@ -144,12 +186,10 @@ class My_GoTo_Trainer(DefaultTrainer):
             hooks.IterationTimer(),
             hooks.LRScheduler(),
             hooks.PreciseBN(
-                # Run at the same freq as (but before) evaluation.
-                cfg.TEST.EVAL_PERIOD,
-                self.model,
-                # Build a new data loader to not affect training
-                self.build_train_loader(cfg),
-                cfg.TEST.PRECISE_BN.NUM_ITER,
+                cfg.SOLVER.MAX_ITER,                # Run precise_BN after each epoch
+                self.model,                         # Assign the current model that must be used for the precise BN
+                self.build_train_loader(cfg),       # Build a new data loader to not affect training
+                cfg.SOLVER.MAX_ITER,                # The number of iterations used to compute the precise values
             )
             if cfg.TEST.PRECISE_BN.ENABLED and get_bn_modules(self.model)
             else None,
@@ -164,6 +204,35 @@ class My_GoTo_Trainer(DefaultTrainer):
             # Here the default print/log frequency of each writer is used.
             # run writers in the end, so that evaluation metrics are written
             write_period = int(np.min([20, MetadataCatalog[self.cfg.DATASETS.TRAIN[0]].num_files_in_dataset/np.min([25, MetadataCatalog[self.cfg.DATASETS.TRAIN[0]].num_files_in_dataset])]))
-            ret.append(hooks.PeriodicWriter(self.build_writers(), period=write_period))
+            ret.append(PeriodicWriter(self.build_writers(), period=write_period))
         return ret
+
+    # def train(self, start_iter: int, max_iter: int):
+    #     """
+    #     Args:
+    #         start_iter, max_iter (int): See docs above
+    #     """
+    #     logger = logging.getLogger(__name__)
+    #     logger.info("Starting training from iteration {}".format(start_iter))
+
+    #     self.iter = self.start_iter = start_iter
+    #     self.max_iter = max_iter
+
+    #     with EventStorage(start_iter) as self.storage:
+    #         try:
+    #             self.before_train()
+    #             for self.iter in range(start_iter, max_iter):
+    #                 self.before_step()
+    #                 self.run_step()
+    #                 self.after_step()
+    #             # self.iter == max_iter can be used by `after_train` to
+    #             # tell whether the training successfully finished or failed
+    #             # due to exceptions.
+    #             self.iter += 1
+    #         except Exception:
+    #             logger.exception("Exception during training:")
+    #             raise
+    #         finally:
+    #             self.after_train()
+
         

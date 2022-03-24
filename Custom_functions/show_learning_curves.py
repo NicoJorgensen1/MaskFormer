@@ -24,7 +24,7 @@ def mov_avg_array(inp_array, mov_of_last_n_elements=4, output_last_n_elements=1)
 
 # Define a function to load the metrics.json in each output directory
 def load_json_metrics(config, data_split="train"):
-    metrics_list = natsorted([x for x in os.listdir(config["OUTPUT_DIR"]) if x.startswith("{:s}_metrics".format(data_split))    # Loop through all files in the output directory ...
+    metrics_list = natsorted([x for x in os.listdir(config["OUTPUT_DIR"]) if x.startswith("{:s}_metrics_".format(data_split))  # Loop through all files in the output directory ...
             and x.endswith(".json") and not np.isnan(extractNumbersFromString(x))])                     # ... and gather all the split_metrics_x.json files, where x=epoch_number and split=run_mode
     metrics = {"epoch_num": list()}                                                                     # Initiate the dictionary to store all the files
     for epoch_idx, metric_file in enumerate(metrics_list):                                              # Iterate over all found metrics files in the output directory

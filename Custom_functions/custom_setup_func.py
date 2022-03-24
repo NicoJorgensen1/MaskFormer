@@ -109,14 +109,14 @@ parser.add_argument("--batch_size", type=int, default=1, help="The batch size us
 parser.add_argument("--num_images", type=int, default=6, help="The number of images to display/segment. Default: 6")
 parser.add_argument("--display_rate", type=int, default=5, help="The epoch_rate of how often to display image segmentations. A display_rate of 3 means that every third epoch, visual segmentations are saved. Default: 25")
 parser.add_argument("--gpus_used", type=int, default=1, help="The number of GPU's to use for training. Only applicable for training with ADE20K. This input argument deprecates the '--num-gpus' argument. Default: 1")
-parser.add_argument("--num_epochs", type=int, default=20, help="The number of epochs to train the model for. Default: 1")
+parser.add_argument("--num_epochs", type=int, default=3, help="The number of epochs to train the model for. Default: 1")
 parser.add_argument("--patience", type=int, default=6, help="The number of epochs to accept that the model hasn't improved before lowering the learning rate by a factor '--lr_gamma'. Default: 6")
 parser.add_argument("--early_stop_patience", type=int, default=15, help="The number of epochs to accept that the model hasn't improved before terminating training. Default: 15")
 parser.add_argument("--dice_loss_weight", type=int, default=10, help="The weighting for the dice loss in the loss function. Default: 10")
 parser.add_argument("--mask_loss_weight", type=int, default=20, help="The weighting for the mask loss in the loss function. Default: 20")
 parser.add_argument("--learning_rate", type=float, default=1e-3, help="The initial learning rate used for training the model. Default: 1e-3")
 parser.add_argument("--lr_gamma", type=float, default=0.20, help="The update factor for the learning rate when the model performance hasn't improved in 'patience' epochs. Will do new_lr=old_lr*lr_gamma. Default 0.20")
-parser.add_argument("--backbone_multiplier", type=float, default=0.50, help="The multiplier for the backbone learning rate. Backbone_lr = learning_rate * backbone_multiplier. Default: 0.50")
+parser.add_argument("--backbone_multiplier", type=float, default=0.20, help="The multiplier for the backbone learning rate. Backbone_lr = learning_rate * backbone_multiplier. Default: 0.20")
 parser.add_argument("--min_delta", type=float, default=5e-4, help="The minimum improvement the model must have made in order to be accepted as an actual improvement. Default 5e-4")
 parser.add_argument("--crop_enabled", type=str2bool, default=True, help="Whether or not cropping is allowed on the images. Default: True")
 parser.add_argument("--inference_only", type=str2bool, default=False, help="Whether or not training is skipped and only inference is run. This input argument deprecates the '--eval_only' argument. Default: False")
@@ -136,7 +136,7 @@ if "vitrolife" in FLAGS.dataset_name.lower():                               # If
     register_vitrolife_data_and_metadata_func(debugging=FLAGS.debugging)    # ... register the vitrolife dataset
     FLAGS.num_queries = 25                                                  # The number of queries/regions to compute in the image should only be 25, when the dataset has a low number of classes
 else:                                                                       # Otherwise, if we are working on the ade20k dataset ...
-    FLAGS.num_queries = 25                                                  # The MaskFormer article finds the best results with 100 queries
+    FLAGS.num_queries = 100                                                 # The MaskFormer article finds the best results with 100 queries
     for split in ["train", "val"]:                                          # ... then we will find the training and the validation set
         MetadataCatalog["ade20k_sem_seg_{:s}".format(split)].num_files_in_dataset = len(DatasetCatalog["ade20k_sem_seg_{:s}".format(split)]())  # ... and create a key-value pair telling the number of files in the dataset
 

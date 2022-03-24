@@ -57,9 +57,9 @@ def changeConfig_withFLAGS(cfg, FLAGS):
     cfg.SOLVER.IMS_PER_BATCH = FLAGS.batch_size                                             # Batch size used when training => batch_size pr GPU = batch_size // num_gpus
     cfg.SOLVER.MAX_ITER = FLAGS.epoch_iter                                                  # <<< Deprecated input argument: Use --num_epochs instead >>>
     cfg.SOLVER.LR_SCHEDULER_NAME = "WarmupMultiStepLR"                                      # Default learning rate scheduler
-    cfg.SOLVER.OPTIMIZER = FLAGS.optimizer_used                                             # The optimizer to use for training the model
+    cfg.SOLVER.OPTIMIZER = FLAGS.optimizer_used.upper()                                     # The optimizer to use for training the model
     cfg.SOLVER.NESTEROV = True                                                              # Whether or not the learning algorithm will use Nesterow momentum
-    cfg.SOLVER.WEIGHT_DECAY = float(1e-3)                                                   # A small lambda value for the weight decay
+    cfg.SOLVER.WEIGHT_DECAY = float(1e-4)                                                   # A small lambda value for the weight decay
     cfg.SOLVER.CLIP_GRADIENTS.ENABLED = False                                               # We won't clip the gradients at any point
     cfg.SOLVER.BACKBONE_MULTIPLIER = FLAGS.backbone_multiplier                              # Backbone learning rate = learning_rate * backbone_multiplier
     cfg.TEST.AUG = False                                                                    # No augmentation used for inference
@@ -70,12 +70,12 @@ def changeConfig_withFLAGS(cfg, FLAGS):
     cfg.MODEL.DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'                       # Assign the device on which the model should run
     cfg.MODEL.MASK_FORMER.DICE_WEIGHT = FLAGS.dice_loss_weight                              # Set the weight for the dice loss (original 2)
     cfg.MODEL.MASK_FORMER.MASK_WEIGHT = FLAGS.mask_loss_weight                              # Set the weight for the mask predictive loss (original 20)
-    cfg.MODEL.MASK_FORMER.DROPOUT = float(0.15)                                             # We'll set a dropout probability on 0.15 when training
-    cfg.MODEL.MASK_FORMER.NO_OBJECT_WEIGHT = float(0.1)                                     # The loss weight for the "no-object" label
+    cfg.MODEL.MASK_FORMER.DROPOUT = float(0.10)                                             # We'll set a dropout probability on 0.10 when training
+    cfg.MODEL.MASK_FORMER.NO_OBJECT_WEIGHT = float(0.10)                                    # The loss weight for the "no-object" label
     cfg.MODEL.MASK_FORMER.TEST.OVERLAP_THRESHOLD = float(0.025)                             # The threshold for overlapping masks
     cfg.MODEL.MASK_FORMER.TEST.PANOPTIC_ON = False                                          # Disable the panoptic head for the maskformer 
     cfg.MODEL.MASK_FORMER.NUM_OBJECT_QUERIES = FLAGS.num_queries                            # The number of queries to detect from the Transformer module 
-    cfg.MODEL.SEM_SEG_HEAD.LOSS_WEIGHT = 1                                                  # Increase loss weight for the sem_seg_head
+    cfg.MODEL.SEM_SEG_HEAD.LOSS_WEIGHT = 2                                                  # Increase loss weight for the sem_seg_head
     cfg.TEST.EVAL_PERIOD = 0                                                                # We won't use the build in evaluation, only the custom evaluation function
     cfg.SOLVER.CHECKPOINT_PERIOD = FLAGS.epoch_iter                                         # Save a new model checkpoint after each epoch, i.e. after everytime the entire trainining set has been seen by the model
     cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST = 0.05                                            # Assign the IoU threshold used for the model
@@ -92,18 +92,11 @@ def changeConfig_withFLAGS(cfg, FLAGS):
         cfg.MODEL.PIXEL_STD = [57.32, 59.69, 61.93]                                         # Write the correct image standard deviation value for the entire vitrolife dataset
         cfg.SOLVER.STEPS = []                                                               # <<< Deprecated input argument: Use --patience instead >>>
         cfg.SOLVER.GAMMA = FLAGS.lr_gamma                                                   # After every "step" iterations the learning rate will be updated, as new_lr = old_lr*gamma
-        cfg.SOLVER.STEPS = np.subtract([int(x+1)*np.min([500, 2+FLAGS.epoch_iter]) for x in range(500)],1).tolist()             # Insert the 'vitrolife' to the output directory, if using the vitrolife dataset
+        cfg.SOLVER.STEPS = []#np.subtract([int(x+1)*np.min([500, 2+FLAGS.epoch_iter]) for x in range(500)],1).tolist()             # Insert the 'vitrolife' to the output directory, if using the vitrolife dataset
         config_name = "vitrolife_" + config_name                                            # Prepend the config name with "vitrolife"
     if FLAGS.debugging==True:                                                               # If we are debugging the model ...
         cfg.SOLVER.WEIGHT_DECAY = float(0)                                                  # ... we don't want any weight decay
         cfg.MODEL.MASK_FORMER.DROPOUT = float(0)                                            # ... we don't wany any dropout
-
-    
-    
-    # cfg.SOLVER.WEIGHT_DECAY = float(0)
-    # cfg.INPUT.FORMAT = "RGB"
-
-
 
     # Write the new config as a .yaml file - it already does, in the output dir...
     os.makedirs(cfg.OUTPUT_DIR, exist_ok=True)                                              # Create the output folder, if it doesn't already exist

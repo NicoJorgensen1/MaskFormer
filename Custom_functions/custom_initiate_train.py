@@ -23,7 +23,6 @@ assert os.path.isdir(dataset_dir), "The dataset directory doesn't exist in the c
 os.environ["DETECTRON2_DATASETS"] = dataset_dir
 
 # Import important libraries
-import shutil                                                                       # Used to copy/rename the metrics.json file after each training/validation step
 import numpy as np                                                                  # Used for algebraic equations
 from time import time                                                               # Used to time the epoch/training duration
 from custom_setup_func import setup_func, zip_output, SaveHistory, printAndLog, getBestEpochResults # Assign to GPU, register vitrolife dataset, create config, zip output_dir, save history_dict, log results, get best results
@@ -40,6 +39,7 @@ from visualize_conf_matrix import plot_confusion_matrix                         
 FLAGS, cfg, log_file = setup_func()
 
 # Create properties
+train_trainer, val_trainer = None, None
 train_loader, val_loader, train_evaluator, val_evaluator, history = None, None, None, None, None    # Initiates all the loaders, evaluators and history as None type objects
 train_mode = "min" if "loss" in FLAGS.eval_metric else "max"                        # Compute the mode of which the performance should be measured. Either a negative or a positive value is better
 new_best = np.inf if train_mode=="min" else -np.inf                                 # Initiate the original "best_value" as either infinity or -infinity according to train_mode
@@ -57,12 +57,12 @@ if FLAGS.inference_only == False:
     for epoch in range(FLAGS.num_epochs):                                           # Iterate over the chosen amount of epochs
         # Training period. Will train the model, correct the metrics files and evaluate performance on the training data
         epoch_start_time = time()                                                   # Now this new epoch starts
-        cfg = launch_custom_training(FLAGS=FLAGS, config=cfg, dataset=train_dataset, epoch=epoch, run_mode="train")  # Launch the training loop for one epoch
+        cfg, train_trainer = launch_custom_training(FLAGS=FLAGS, config=cfg, dataset=train_dataset, epoch=epoch, run_mode="train", trainer=train_trainer)   # Launch the training loop for one epoch
         eval_train_results, train_loader, train_evaluator, conf_matrix_train = evaluateResults(FLAGS, cfg, data_split="train", dataloader=train_loader, evaluator=train_evaluator) # Evaluate the result metrics on the training set
         train_pq_results = pq_evaluation(args=FLAGS, config=cfg, data_split="train")# Evaluate the Panoptic Quality for the training semantic segmentation results
 
         # Validation period. Will 'train' with lr=0 on validation data, correct the metrics files and evaluate performance on validation data
-        cfg = launch_custom_training(FLAGS=FLAGS, config=cfg, dataset=val_dataset, epoch=epoch, run_mode="val")  # Launch the training loop for one epoch
+        cfg, val_trainer = launch_custom_training(FLAGS=FLAGS, config=cfg, dataset=val_dataset, epoch=epoch, run_mode="val", trainer=val_trainer)   # Launch the training loop for one epoch
         eval_val_results, val_loader, val_evaluator, conf_matrix_val = evaluateResults(FLAGS, cfg, data_split="val", dataloader=val_loader, evaluator=val_evaluator) # Evaluate the result metrics on the training set
         val_pq_results = pq_evaluation(args=FLAGS, config=cfg, data_split="val")    # Evaluate the Panoptic Quality for the validation semantic segmentation results
         
