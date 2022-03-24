@@ -56,7 +56,8 @@ def changeConfig_withFLAGS(cfg, FLAGS):
     cfg.SOLVER.BASE_LR = FLAGS.learning_rate                                                # Starting learning rate
     cfg.SOLVER.IMS_PER_BATCH = FLAGS.batch_size                                             # Batch size used when training => batch_size pr GPU = batch_size // num_gpus
     cfg.SOLVER.MAX_ITER = FLAGS.epoch_iter                                                  # <<< Deprecated input argument: Use --num_epochs instead >>>
-    cfg.SOLVER.LR_SCHEDULER_NAME = "WarmupMultiStepLR"                                      # Default learning rate scheduler
+    # cfg.SOLVER.LR_SCHEDULER_NAME = "WarmupMultiStepLR"                                      # Default learning rate scheduler
+    cfg.SOLVER.LR_SCHEDULER_NAME = "WarmupCosineLR"                                      # Default learning rate scheduler
     cfg.SOLVER.OPTIMIZER = FLAGS.optimizer_used.upper()                                     # The optimizer to use for training the model
     cfg.SOLVER.NESTEROV = True                                                              # Whether or not the learning algorithm will use Nesterow momentum
     cfg.SOLVER.WEIGHT_DECAY = float(1e-4)                                                   # A small lambda value for the weight decay
