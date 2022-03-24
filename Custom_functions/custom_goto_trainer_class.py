@@ -21,6 +21,8 @@ from detectron2.projects.deeplab import build_lr_scheduler
 from detectron2.solver.build import maybe_add_gradient_clipping
 from detectron2.data import transforms as T
 from mask_former import MaskFormerSemanticDatasetMapper
+from detectron2.solver.lr_scheduler import LRMultiplier
+from fvcore.common.param_scheduler import CosineParamScheduler
 from fvcore.nn.precise_bn import get_bn_modules
 from PIL import Image
 
@@ -92,7 +94,9 @@ class My_GoTo_Trainer(DefaultTrainer):
 
     @classmethod
     def build_lr_scheduler(cls, cfg, optimizer):
-        return build_lr_scheduler(cfg, optimizer)
+        sched = CosineParamScheduler(1, 0.25)
+        scheduler = LRMultiplier(optimizer, multiplier=sched, max_iter=cfg.SOLVER.MAX_ITER)
+        return scheduler#build_lr_scheduler(cfg, optimizer)
     
     @classmethod
     def build_optimizer(cls, cfg, model):
