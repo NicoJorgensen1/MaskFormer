@@ -37,7 +37,7 @@ def run_train_func(FLAGS, trainer, run_mode):
     #     trainer.iter += 1
     #     trainer.start_iter += 1
     Trainer.train()
-    return Trainer
+    return #Trainer
 
 
 # Function to launch the training
@@ -47,11 +47,12 @@ def launch_custom_training(FLAGS, config, dataset, epoch=0, run_mode="train", tr
     if "val" in run_mode.lower(): config.SOLVER.BASE_LR = float(0)                                          # If we are on the validation split set the learning rate to 0
     else: config.SOLVER.BASE_LR = FLAGS.learning_rate                                                       # Else, we are on the training split, so assign the latest saved learning rate to the config
     config.DATASETS.TRAIN = dataset                                                                         # Change the config dataset used to the dataset sent along ...
-    trainer_class = run_train_func(FLAGS=FLAGS, trainer=trainer, run_mode=run_mode)                         # Run the training for the current epoch
+    # trainer_class = run_train_func(FLAGS=FLAGS, trainer=trainer, run_mode=run_mode)                         # Run the training for the current epoch
+    run_train_func(FLAGS=FLAGS, trainer=None, run_mode=run_mode)                         # Run the training for the current epoch
     shutil.copyfile(os.path.join(config.OUTPUT_DIR, "metrics.json"),                                        # Rename the metrics.json to "run_mode"_metricsX.json ...
         os.path.join(config.OUTPUT_DIR, run_mode+"_metrics_{:d}.json".format(epoch+1)))                     # ... where X is the current epoch number
     os.remove(os.path.join(config.OUTPUT_DIR, "metrics.json"))                                              # Remove the original metrics file
     shutil.copyfile(os.path.join(config.OUTPUT_DIR, "model_final.pth"),                                     # Rename the metrics.json to "run_mode"_metricsX.json ...
         os.path.join(config.OUTPUT_DIR, "model_epoch_{:d}.pth".format(epoch+1)))                            # ... where X is the current epoch number    
     [os.remove(os.path.join(config.OUTPUT_DIR, x)) for x in os.listdir(config.OUTPUT_DIR) if "model_" in x and "epoch" not in x and x.endswith(".pth")]  # Remove all irrelevant models
-    return config, trainer_class
+    return config, None# trainer_class

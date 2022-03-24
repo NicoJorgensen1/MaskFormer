@@ -12,6 +12,7 @@ from detectron2.data.samplers.distributed_sampler import TrainingSampler
 from detectron2.engine import DefaultTrainer, hooks
 from detectron2.engine.hooks import PeriodicWriter
 from detectron2.engine.train_loop import SimpleTrainer
+import math
 from detectron2.utils.events import EventWriter
 from detectron2.utils.logger import setup_logger
 from detectron2.checkpoint import DetectionCheckpointer
@@ -43,6 +44,36 @@ def custom_augmentation_mapper(config, is_train=True):
             T.Resize((500,500), Image.BILINEAR)]                            # https://detectron2.readthedocs.io/en/latest/modules/data_transforms.html#detectron2.data.transforms.Resize
     custom_mapper = MaskFormerSemanticDatasetMapper(config, is_train=is_train, augmentations=transform_list)    # Create the mapping from data dictionary to augmented training image
     return custom_mapper
+
+
+class CosineParamScheduler2(CosineParamScheduler):
+    """
+    Cosine decay or cosine warmup schedules based on start and end values.
+    The schedule is updated based on the fraction of training progress.
+    The schedule was proposed in 'SGDR: Stochastic Gradient Descent with
+    Warm Restarts' (https://arxiv.org/abs/1608.03983). Note that this class
+    only implements the cosine annealing part of SGDR, and not the restarts.
+
+    Example:
+
+        .. code-block:: python
+
+          CosineParamScheduler(start_value=0.1, end_value=0.0001)
+    """
+
+    def __init__(
+        self,
+        start_value: float,
+        end_value: float,
+    ) -> None:
+        self._start_value = start_value
+        self._end_value = end_value
+
+    def __call__(self, where: float) -> float:
+        where *= 2
+        return self._end_value + 0.5 * (self._start_value - self._end_value) * (
+            1 + math.cos(math.pi * where)
+        )
 
 
 # Custom Trainer class build on the DefaultTrainer class. This is mostly copied from the train_net.py
@@ -94,7 +125,7 @@ class My_GoTo_Trainer(DefaultTrainer):
 
     @classmethod
     def build_lr_scheduler(cls, cfg, optimizer):
-        sched = CosineParamScheduler(1, 0.25)
+        sched = CosineParamScheduler2(1, 0.50)
         scheduler = LRMultiplier(optimizer, multiplier=sched, max_iter=cfg.SOLVER.MAX_ITER)
         return scheduler#build_lr_scheduler(cfg, optimizer)
     
