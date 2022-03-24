@@ -28,16 +28,16 @@ def run_train_func(FLAGS, trainer, run_mode):
         return res
     
     # if trainer is None:
-    trainer = My_GoTo_Trainer(cfg)
-    trainer.resume_or_load(resume=False)
+    Trainer = My_GoTo_Trainer(cfg)
+    Trainer.resume_or_load(resume=False)
     # else:
     #     trainer.resume_or_load(resume=True)                                                               # We'll resume training 
         # trainer.max_iter += FLAGS.epoch_iter+1                                                            # Extend the max_iter with the epoch_iter to continue training
         # trainer.build_writers()                                                                           # For some reason we have to re-build the writers in order to make a new metrics.json file
     #     trainer.iter += 1
     #     trainer.start_iter += 1
-    trainer.train()
-    return trainer
+    Trainer.train()
+    return Trainer
 
 
 # Function to launch the training
