@@ -64,7 +64,7 @@ class My_GoTo_Trainer(DefaultTrainer):
         logger = logging.getLogger("detectron2")
         if not logger.isEnabledFor(logging.INFO):  # setup_logger is not called for d2
             setup_logger()
-        cfg = DefaultTrainer.auto_scale_workers(cfg, comm.get_world_size())
+        cfg = super().auto_scale_workers(cfg, comm.get_world_size())
 
         # Assume these objects must be constructed in this order.
         model = self.build_model(cfg)

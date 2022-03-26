@@ -115,7 +115,7 @@ def show_history(config, FLAGS, metrics_train, metrics_eval, pq_train, pq_val, h
     Pixel Accuracy (pACC)
     """
     # Create history and list of relevant history keys
-    history = combineDataToHistoryDictionaryFunc(config=config, eval_metrics=metrics_train, pq_metrics=pq_train, data_split="train", history=history)
+    if FLAGS.inference_only==False: history = combineDataToHistoryDictionaryFunc(config=config, eval_metrics=metrics_train, pq_metrics=pq_train, data_split="train", history=history)
     history = combineDataToHistoryDictionaryFunc(config=config, eval_metrics=metrics_eval, pq_metrics=pq_val, data_split="val", history=history)
     hist_keys = extractRelevantHistoryKeys(history)
     ax_titles = ["Total_loss", "mIoU and fwIoU", "PQ, RQ, SQ", "mACC and pACC", "Loss_CE", "Loss_DICE", "Loss_Mask",        # Create titles and ylabels ...
@@ -145,14 +145,14 @@ def show_history(config, FLAGS, metrics_train, metrics_eval, pq_train, pq_val, h
             plt.xlabel(xlabel="Epoch #")                                                                # Set correct xlabel
             plt.ylabel(ylabel=ax_titles[ax_count].replace("_", " "))                                    # Set correct ylabel
             plt.grid(True)                                                                              # Activate the grid on the plot
-            plt.xlim(left=0, right=np.max(history["train_epoch_num"]))                                  # Set correct xlim
+            plt.xlim(left=0, right=np.max(history["val_epoch_num"]))                                    # Set correct xlim
             plt.title(label=ax_titles[ax_count].replace("_", " "))                                      # Set plot title
             y_top_val = 0                                                                               # Initiate a value to determine the y_max value of the plot
             for kk, key in enumerate(sorted(hist_keys[ax_count], key=str.lower)):                       # Looping through all keys in the history dict that will be shown on the current subplot axes
                 if np.max(history[key]) > y_top_val:                                                    # If the maximum value in the array is larger than the current y_top_val ...
                     y_top_val = np.ceil(np.max(history[key])/10)*10                                     # ... y_top_val is updated and rounded to the nearest 10
-                plt.plot(np.linspace(start=np.min(history["train_epoch_num"])-(0 if any([x in key for x in ["ACC", "IoU", "PQ", "RQ", "SQ"]]) else 1),   # Plot the data, using a linspace ...
-                    stop=np.max(history["train_epoch_num"]), num=len(history[key])), history[key], color=colors[kk], linestyle="-", marker=".") # ... argument for the x-axis and the data itself for the y-axis
+                plt.plot(np.linspace(start=np.min(history["val_epoch_num"])-(0 if any([x in key for x in ["ACC", "IoU", "PQ", "RQ", "SQ"]]) else 1),    # Plot the data, using a linspace ...
+                    stop=np.max(history["val_epoch_num"]), num=len(history[key])), history[key], color=colors[kk], linestyle="-", marker=".")   # ... argument for the x-axis and the data itself for the y-axis
             plt.legend(sorted([key for key in hist_keys[ax_count]], key=str.lower),                     # Create a legend for the subplot with ...
                     framealpha=0.35, loc="best" if len(hist_keys[ax_count])<4 else "upper left")        # ... the history keys displayed
             ax_count += 1                                                                               # Increase the subplot counter

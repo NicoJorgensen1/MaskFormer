@@ -21,17 +21,10 @@ def setup(FLAGS):
 def run_train_func(FLAGS, run_mode, epoch):
     cfg = setup(FLAGS)
 
-    if FLAGS.eval_only:
-        model = My_GoTo_Trainer.build_model(cfg)
-        DetectionCheckpointer(model, save_dir=cfg.OUTPUT_DIR).resume_or_load(cfg.MODEL.WEIGHTS, resume=FLAGS.resume)
-        res = My_GoTo_Trainer.test(cfg, model)
-        return res
-    
     # if trainer is None:
     Trainer = My_GoTo_Trainer(cfg)
     # Trainer.resume_or_load(resume=False)
-    Trainer.train()
-    return 
+    return Trainer.train()
 
 
 # Function to launch the training

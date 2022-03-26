@@ -74,6 +74,7 @@ def changeFLAGS(FLAGS):
     if FLAGS.debugging: FLAGS.eval_metric.replace("val", "train")           # The metric used for evaluation will be a training metric, if we are debugging the model
     if FLAGS.use_per_pixel_baseline: FLAGS.resnet_depth = 50                # The per-pixel baseline can only be used with a ResNet depth of 50 
     if FLAGS.use_transformer_backbone: FLAGS.learning_rate /= 50            # The learning rate must be lower when using the larger transformer backbone
+    if FLAGS.inference_only: FLAGS.num_epochs = 1                           # If we are only using inference, then we'll only run through one epoch
     return FLAGS
 
 # Define a function to extract the final results that will be printed in the log file
@@ -100,7 +101,7 @@ parser.add_argument("--dataset_name", type=str, default="vitrolife", help="Which
 parser.add_argument("--output_dir_postfix", type=str, default=start_time, help="Filename extension to add to the output directory of the current process. Default: now: 'HH_MM_DDMMMYYYY'")
 parser.add_argument("--eval_metric", type=str, default="val_fwIoU", help="Metric to use in order to determine the 'best' model weights. Available: val_/train_ prefix to [total_loss, mIoU, fwIoU, mACC, PQ, RQ, SQ]. Default: val_fwIoU")
 parser.add_argument("--optimizer_used", type=str, default="ADAMW", help="Optimizer to use. Available [SGD, ADAMW]. Default: ADAMW")
-parser.add_argument("--num_workers", type=int, default=4, help="Number of workers to use for training the model. Default: 2")
+parser.add_argument("--num_workers", type=int, default=4, help="Number of workers to use for training the model. Default: 4")
 parser.add_argument("--max_iter", type=int, default=int(5e1), help="Maximum number of iterations to train the model for. <<Deprecated argument. Use 'num_epochs' instead>>. Default: 100000")
 parser.add_argument("--img_size_min", type=int, default=500, help="The length of the smallest size of the training images. Default: 500")
 parser.add_argument("--img_size_max", type=int, default=500, help="The length of the largest size of the training images. Default: 500")
@@ -110,7 +111,7 @@ parser.add_argument("--num_images", type=int, default=6, help="The number of ima
 parser.add_argument("--display_rate", type=int, default=5, help="The epoch_rate of how often to display image segmentations. A display_rate of 3 means that every third epoch, visual segmentations are saved. Default: 25")
 parser.add_argument("--gpus_used", type=int, default=1, help="The number of GPU's to use for training. Only applicable for training with ADE20K. This input argument deprecates the '--num-gpus' argument. Default: 1")
 parser.add_argument("--num_epochs", type=int, default=5, help="The number of epochs to train the model for. Default: 1")
-parser.add_argument("--patience", type=int, default=2, help="The number of epochs to accept that the model hasn't improved before lowering the learning rate by a factor '--lr_gamma'. Default: 6")
+parser.add_argument("--patience", type=int, default=6, help="The number of epochs to accept that the model hasn't improved before lowering the learning rate by a factor '--lr_gamma'. Default: 6")
 parser.add_argument("--early_stop_patience", type=int, default=15, help="The number of epochs to accept that the model hasn't improved before terminating training. Default: 15")
 parser.add_argument("--dice_loss_weight", type=int, default=10, help="The weighting for the dice loss in the loss function. Default: 10")
 parser.add_argument("--mask_loss_weight", type=int, default=20, help="The weighting for the mask loss in the loss function. Default: 20")
