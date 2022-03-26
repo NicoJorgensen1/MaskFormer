@@ -18,7 +18,7 @@ def setup(FLAGS):
     return cfg
 
 
-def run_train_func(FLAGS, trainer, run_mode):
+def run_train_func(FLAGS, run_mode, epoch):
     cfg = setup(FLAGS)
 
     if FLAGS.eval_only:
@@ -29,7 +29,12 @@ def run_train_func(FLAGS, trainer, run_mode):
     
     # if trainer is None:
     Trainer = My_GoTo_Trainer(cfg)
+    if "val" in run_mode:
+        starting_val, stopping_val = 0, 0
+    else:
+        starting_val, stopping_val = 1, 0.25        # Do something with some warmup and calculations with the epoch number 
     Trainer.resume_or_load(resume=False)
+    Trainer.build_lr_scheduler(cfg, Trainer.optimizer, start_val=starting_val, end_val=stopping_val)
     # else:
     #     trainer.resume_or_load(resume=True)                                                               # We'll resume training 
         # trainer.max_iter += FLAGS.epoch_iter+1                                                            # Extend the max_iter with the epoch_iter to continue training
@@ -37,22 +42,21 @@ def run_train_func(FLAGS, trainer, run_mode):
     #     trainer.iter += 1
     #     trainer.start_iter += 1
     Trainer.train()
-    return #Trainer
+    return 
 
 
 # Function to launch the training
-def launch_custom_training(FLAGS, config, dataset, epoch=0, run_mode="train", trainer=None):
+def launch_custom_training(FLAGS, config, dataset, epoch=0, run_mode="train"):
     FLAGS.config = config                                                                                   # Save the config on the FLAGS argument
     config = putModelWeights(config)                                                                        # Assign the latest saved model to the config
     if "val" in run_mode.lower(): config.SOLVER.BASE_LR = float(0)                                          # If we are on the validation split set the learning rate to 0
     else: config.SOLVER.BASE_LR = FLAGS.learning_rate                                                       # Else, we are on the training split, so assign the latest saved learning rate to the config
     config.DATASETS.TRAIN = dataset                                                                         # Change the config dataset used to the dataset sent along ...
-    # trainer_class = run_train_func(FLAGS=FLAGS, trainer=trainer, run_mode=run_mode)                         # Run the training for the current epoch
-    run_train_func(FLAGS=FLAGS, trainer=None, run_mode=run_mode)                         # Run the training for the current epoch
+    run_train_func(FLAGS=FLAGS, run_mode=run_mode, epoch=epoch)                                             # Run the training for the current epoch
     shutil.copyfile(os.path.join(config.OUTPUT_DIR, "metrics.json"),                                        # Rename the metrics.json to "run_mode"_metricsX.json ...
         os.path.join(config.OUTPUT_DIR, run_mode+"_metrics_{:d}.json".format(epoch+1)))                     # ... where X is the current epoch number
     os.remove(os.path.join(config.OUTPUT_DIR, "metrics.json"))                                              # Remove the original metrics file
     shutil.copyfile(os.path.join(config.OUTPUT_DIR, "model_final.pth"),                                     # Rename the metrics.json to "run_mode"_metricsX.json ...
         os.path.join(config.OUTPUT_DIR, "model_epoch_{:d}.pth".format(epoch+1)))                            # ... where X is the current epoch number    
     [os.remove(os.path.join(config.OUTPUT_DIR, x)) for x in os.listdir(config.OUTPUT_DIR) if "model_" in x and "epoch" not in x and x.endswith(".pth")]  # Remove all irrelevant models
-    return config, None# trainer_class
+    return config

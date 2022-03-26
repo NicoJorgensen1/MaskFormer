@@ -57,12 +57,12 @@ if FLAGS.inference_only == False:
     for epoch in range(FLAGS.num_epochs):                                           # Iterate over the chosen amount of epochs
         # Training period. Will train the model, correct the metrics files and evaluate performance on the training data
         epoch_start_time = time()                                                   # Now this new epoch starts
-        cfg, train_trainer = launch_custom_training(FLAGS=FLAGS, config=cfg, dataset=train_dataset, epoch=epoch, run_mode="train", trainer=train_trainer)   # Launch the training loop for one epoch
+        cfg = launch_custom_training(FLAGS=FLAGS, config=cfg, dataset=train_dataset, epoch=epoch, run_mode="train") # Launch the training loop for one epoch
         eval_train_results, train_loader, train_evaluator, conf_matrix_train = evaluateResults(FLAGS, cfg, data_split="train", dataloader=train_loader, evaluator=train_evaluator) # Evaluate the result metrics on the training set
         train_pq_results = pq_evaluation(args=FLAGS, config=cfg, data_split="train")# Evaluate the Panoptic Quality for the training semantic segmentation results
 
         # Validation period. Will 'train' with lr=0 on validation data, correct the metrics files and evaluate performance on validation data
-        cfg, val_trainer = launch_custom_training(FLAGS=FLAGS, config=cfg, dataset=val_dataset, epoch=epoch, run_mode="val", trainer=val_trainer)   # Launch the training loop for one epoch
+        cfg = launch_custom_training(FLAGS=FLAGS, config=cfg, dataset=val_dataset, epoch=epoch, run_mode="val") # Launch the training loop for one epoch
         eval_val_results, val_loader, val_evaluator, conf_matrix_val = evaluateResults(FLAGS, cfg, data_split="val", dataloader=val_loader, evaluator=val_evaluator) # Evaluate the result metrics on the training set
         val_pq_results = pq_evaluation(args=FLAGS, config=cfg, data_split="val")    # Evaluate the Panoptic Quality for the validation semantic segmentation results
         
@@ -113,7 +113,7 @@ if "test" in cfg.DATASETS.TEST[0]:
 
 # Remove all metrics.json files, the default log-file and zip the resulting output directory
 [os.remove(os.path.join(cfg.OUTPUT_DIR, x)) for x in os.listdir(cfg.OUTPUT_DIR) if "metrics" in x.lower() and x.endswith(".json")]
-os.remove(os.path.join(cfg.OUTPUT_DIR, "log.txt"))
+# os.remove(os.path.join(cfg.OUTPUT_DIR, "log.txt"))
 zip_output(cfg)
 
 

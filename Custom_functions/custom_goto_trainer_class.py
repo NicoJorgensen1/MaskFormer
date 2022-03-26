@@ -45,35 +45,16 @@ def custom_augmentation_mapper(config, is_train=True):
     custom_mapper = MaskFormerSemanticDatasetMapper(config, is_train=is_train, augmentations=transform_list)    # Create the mapping from data dictionary to augmented training image
     return custom_mapper
 
-
+# Cosine lr_scheduler
 class CosineParamScheduler2(CosineParamScheduler):
-    """
-    Cosine decay or cosine warmup schedules based on start and end values.
-    The schedule is updated based on the fraction of training progress.
-    The schedule was proposed in 'SGDR: Stochastic Gradient Descent with
-    Warm Restarts' (https://arxiv.org/abs/1608.03983). Note that this class
-    only implements the cosine annealing part of SGDR, and not the restarts.
-
-    Example:
-
-        .. code-block:: python
-
-          CosineParamScheduler(start_value=0.1, end_value=0.0001)
-    """
-
-    def __init__(
-        self,
-        start_value: float,
-        end_value: float,
-    ) -> None:
-        self._start_value = start_value
-        self._end_value = end_value
-
-    def __call__(self, where: float) -> float:
-        where *= 2
-        return self._end_value + 0.5 * (self._start_value - self._end_value) * (
-            1 + math.cos(math.pi * where)
-        )
+    def __init__(self, start_value, end_value):
+        self._start_value = float(start_value)
+        self._end_value = float(end_value)
+    
+    def __call__(self, where):
+        where = float(where)
+        new_lr = float(self._end_value + 0.5 * (self._start_value - self._end_value) * (1 + math.cos(math.pi * where)))
+        return new_lr
 
 
 # Custom Trainer class build on the DefaultTrainer class. This is mostly copied from the train_net.py
@@ -97,14 +78,8 @@ class My_GoTo_Trainer(DefaultTrainer):
         model = create_ddp_model(model, broadcast_buffers=False)
         self._trainer = SimpleTrainer(model, data_loader, optimizer)
 
-        self.scheduler = self.build_lr_scheduler(cfg, optimizer)
-        self.checkpointer = DetectionCheckpointer(
-            # Assume you want to save checkpoints together with logs/statistics
-            model,
-            cfg.OUTPUT_DIR,
-            save_to_disk = "train" in cfg.DATASETS.TRAIN[0],                # We'll only save a model if we are training, not during validation
-            trainer=weakref.proxy(self),
-        )
+        self.scheduler = self.build_lr_scheduler2(cfg, optimizer)
+        self.checkpointer = DetectionCheckpointer(model, cfg.OUTPUT_DIR, save_to_disk = "train" in cfg.DATASETS.TRAIN[0], trainer=weakref.proxy(self))
         self.start_iter = 0
         self.max_iter = cfg.SOLVER.MAX_ITER
         self.cfg = cfg
@@ -124,10 +99,10 @@ class My_GoTo_Trainer(DefaultTrainer):
         return build_detection_train_loader(cfg, mapper=mapper, sampler=TrainingSampler(size=MetadataCatalog[cfg.DATASETS.TRAIN[0]].num_files_in_dataset, shuffle=True))
 
     @classmethod
-    def build_lr_scheduler(cls, cfg, optimizer):
-        sched = CosineParamScheduler2(1, 0.50)
+    def build_lr_scheduler2(cls, cfg, optimizer, start_val=1, end_val=0.25):
+        sched = CosineParamScheduler2(start_value=start_val, end_value=end_val)
         scheduler = LRMultiplier(optimizer, multiplier=sched, max_iter=cfg.SOLVER.MAX_ITER)
-        return scheduler#build_lr_scheduler(cfg, optimizer)
+        return scheduler
     
     @classmethod
     def build_optimizer(cls, cfg, model):
