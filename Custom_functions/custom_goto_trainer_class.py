@@ -60,10 +60,6 @@ class CosineParamScheduler2(CosineParamScheduler):
 # Custom Trainer class build on the DefaultTrainer class. This is mostly copied from the train_net.py
 class My_GoTo_Trainer(DefaultTrainer):
     def __init__(self, cfg):
-        """
-        Args:
-            cfg (CfgNode):
-        """
         super().__init__(cfg)
         logger = logging.getLogger("detectron2")
         if not logger.isEnabledFor(logging.INFO):  # setup_logger is not called for d2
@@ -74,16 +70,13 @@ class My_GoTo_Trainer(DefaultTrainer):
         model = self.build_model(cfg)
         optimizer = self.build_optimizer(cfg, model)
         data_loader = self.build_train_loader(cfg)
-
         model = create_ddp_model(model, broadcast_buffers=False)
         self._trainer = SimpleTrainer(model, data_loader, optimizer)
-
         self.scheduler = self.build_lr_scheduler2(cfg, optimizer)
         self.checkpointer = DetectionCheckpointer(model, cfg.OUTPUT_DIR, save_to_disk = "train" in cfg.DATASETS.TRAIN[0], trainer=weakref.proxy(self))
         self.start_iter = 0
         self.max_iter = cfg.SOLVER.MAX_ITER
         self.cfg = cfg
-
         self.register_hooks(self.build_hooks())
 
 
@@ -100,6 +93,7 @@ class My_GoTo_Trainer(DefaultTrainer):
 
     @classmethod
     def build_lr_scheduler2(cls, cfg, optimizer, start_val=1, end_val=0.25):
+        if "val" in cfg.DATASETS.TRAIN[0]: start_val, end_val = 0, 0
         sched = CosineParamScheduler2(start_value=start_val, end_value=end_val)
         scheduler = LRMultiplier(optimizer, multiplier=sched, max_iter=cfg.SOLVER.MAX_ITER)
         return scheduler
@@ -123,8 +117,7 @@ class My_GoTo_Trainer(DefaultTrainer):
             torch.nn.InstanceNorm2d,
             torch.nn.InstanceNorm3d,
             torch.nn.LayerNorm,
-            torch.nn.LocalResponseNorm,
-        )
+            torch.nn.LocalResponseNorm)
 
         params: List[Dict[str, Any]] = []
         memo: Set[torch.nn.parameter.Parameter] = set()

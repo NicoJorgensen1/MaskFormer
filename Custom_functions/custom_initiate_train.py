@@ -112,7 +112,7 @@ if "test" in cfg.DATASETS.TEST[0]:
     printAndLog(input_to_write=test_history, logs=log_file, prefix="")
 
 # Remove all metrics.json files, the default log-file and zip the resulting output directory
-[os.remove(os.path.join(cfg.OUTPUT_DIR, x)) for x in os.listdir(cfg.OUTPUT_DIR) if "metrics" in x.lower() and x.endswith(".json")]
+# [os.remove(os.path.join(cfg.OUTPUT_DIR, x)) for x in os.listdir(cfg.OUTPUT_DIR) if "metrics" in x.lower() and x.endswith(".json")]
 # os.remove(os.path.join(cfg.OUTPUT_DIR, "log.txt"))
 zip_output(cfg)
 
