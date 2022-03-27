@@ -1,9 +1,6 @@
 import itertools
-import os
 import torch
 import numpy as np
-import weakref
-import logging
 from copy import copy
 from detectron2.utils import comm
 from typing import Any, Dict, List, Set
@@ -11,14 +8,6 @@ from detectron2.data import build_detection_train_loader, MetadataCatalog
 from detectron2.data.samplers.distributed_sampler import TrainingSampler
 from detectron2.engine import DefaultTrainer, hooks
 from detectron2.engine.hooks import PeriodicWriter
-from detectron2.engine.train_loop import SimpleTrainer
-import math
-from detectron2.utils.events import EventWriter
-from detectron2.utils.logger import setup_logger
-from detectron2.checkpoint import DetectionCheckpointer
-from detectron2.utils.file_io import PathManager
-from detectron2.engine.defaults import create_ddp_model
-from detectron2.projects.deeplab import build_lr_scheduler
 from detectron2.solver.build import maybe_add_gradient_clipping
 from detectron2.data import transforms as T
 from mask_former import MaskFormerSemanticDatasetMapper
@@ -47,39 +36,20 @@ def custom_augmentation_mapper(config, is_train=True):
 
 # Cosine lr_scheduler
 class CosineParamScheduler2(CosineParamScheduler):
-    def __init__(self, start_value, end_value):
+    def __init__(self, start_value, end_value, warm_up=False):
         self._start_value = float(start_value)
         self._end_value = float(end_value)
+        self.warm_up = warm_up
     
     def __call__(self, where):
         where = float(where)
-        new_lr = float(self._end_value + 0.5 * (self._start_value - self._end_value) * (1 + math.cos(math.pi * where)))
+        new_lr = float(np.add(self._end_value, np.multiply(np.multiply(0.5, np.subtract(self._start_value, self._end_value)), (np.add(1, np.cos(np.multiply(np.pi, where)))))))
+        # new_lr = float(self._end_value + 0.5 * (self._start_value - self._end_value) * (1 + np.cos(np.pi * where)))
         return new_lr
 
 
 # Custom Trainer class build on the DefaultTrainer class. This is mostly copied from the train_net.py
 class My_GoTo_Trainer(DefaultTrainer):
-    def __init__(self, cfg):
-        super().__init__(cfg)
-        logger = logging.getLogger("detectron2")
-        if not logger.isEnabledFor(logging.INFO):  # setup_logger is not called for d2
-            setup_logger()
-        cfg = super().auto_scale_workers(cfg, comm.get_world_size())
-
-        # Assume these objects must be constructed in this order.
-        model = self.build_model(cfg)
-        optimizer = self.build_optimizer(cfg, model)
-        data_loader = self.build_train_loader(cfg)
-        model = create_ddp_model(model, broadcast_buffers=False)
-        self._trainer = SimpleTrainer(model, data_loader, optimizer)
-        self.scheduler = self.build_lr_scheduler2(cfg, optimizer)
-        self.checkpointer = DetectionCheckpointer(model, cfg.OUTPUT_DIR, save_to_disk = "train" in cfg.DATASETS.TRAIN[0], trainer=weakref.proxy(self))
-        self.start_iter = 0
-        self.max_iter = cfg.SOLVER.MAX_ITER
-        self.cfg = cfg
-        self.register_hooks(self.build_hooks())
-
-
     # We'll only use the custom evaluation, not any build-in method...
     @classmethod
     def build_evaluator(cls, cfg, dataset_name, output_folder=None):
@@ -92,8 +62,19 @@ class My_GoTo_Trainer(DefaultTrainer):
         return build_detection_train_loader(cfg, mapper=mapper, sampler=TrainingSampler(size=MetadataCatalog[cfg.DATASETS.TRAIN[0]].num_files_in_dataset, shuffle=True))
 
     @classmethod
-    def build_lr_scheduler2(cls, cfg, optimizer, start_val=1, end_val=0.25):
-        if "val" in cfg.DATASETS.TRAIN[0]: start_val, end_val = 0, 0
+    def build_lr_scheduler(cls, cfg, optimizer, start_val=1, end_val=1):
+        for item in cfg.custom_key[::-1]:                                                                       # Iterate over the custom keys in reversed order
+            if "epoch_num" in item[0]: current_epoch = item[1]                                                  # If the current item is the tuple with the epoch_number and the current epoch number is noted
+            if "learning_rate" in item[0]: wanted_lr = item[1]                                                  # Get the initial learning rate
+            if "warm_up_epochs" in item[0]: warm_ups = item[1]                                                  # Get the wanted number of warm up epochs
+        if warm_ups >= current_epoch:                                                                           # If we are still in the warm up phase ...
+            learn_rates = np.linspace(start=np.divide(wanted_lr, 100), stop=wanted_lr, num=warm_ups+1)          # ... we'll create an array of the possible learning rates to choose from
+            learn_rates = np.multiply(learn_rates, 100)                                                         # For some reason necessary ... 
+            start_val = learn_rates[current_epoch-1]                                                            # ... and then choose the starting learning rate as the lower one
+            end_val = learn_rates[current_epoch]                                                                # ... and then choose the next learning rate as the higher one
+        elif warm_ups < current_epoch:                                                                          # Instead if we are in the regular training period ...
+            start_val, end_val = float(1), float(1)
+        if "train" not in cfg.DATASETS.TRAIN[0]: start_val, end_val = 0, 0                                      # If we are using the validation or test set, then learning rates are set to 0
         sched = CosineParamScheduler2(start_value=start_val, end_value=end_val)
         scheduler = LRMultiplier(optimizer, multiplier=sched, max_iter=cfg.SOLVER.MAX_ITER)
         return scheduler
@@ -189,10 +170,10 @@ class My_GoTo_Trainer(DefaultTrainer):
             hooks.IterationTimer(),
             hooks.LRScheduler(),
             hooks.PreciseBN(
-                cfg.SOLVER.MAX_ITER,                # Run precise_BN after each epoch
-                self.model,                         # Assign the current model that must be used for the precise BN
-                self.build_train_loader(cfg),       # Build a new data loader to not affect training
-                cfg.SOLVER.MAX_ITER,                # The number of iterations used to compute the precise values
+                int(np.ceil(cfg.SOLVER.MAX_ITER/15)),   # Run precise_BN after 2/3 of each epoch
+                self.model,                             # Assign the current model that must be used for the precise BN
+                self.build_train_loader(cfg),           # Build a new data loader to not affect training
+                int(np.ceil(cfg.SOLVER.MAX_ITER/15)),   # The number of iterations used to compute the precise values
             )
             if cfg.TEST.PRECISE_BN.ENABLED and get_bn_modules(self.model)
             else None,

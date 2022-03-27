@@ -73,7 +73,6 @@ def changeFLAGS(FLAGS):
     if FLAGS.min_delta < 1.0: FLAGS.min_delta *= 100                        # As the model outputs metrics multiplied by a factor of 100, the min_delta value must also be scaled accordingly
     if FLAGS.debugging: FLAGS.eval_metric.replace("val", "train")           # The metric used for evaluation will be a training metric, if we are debugging the model
     if FLAGS.use_per_pixel_baseline: FLAGS.resnet_depth = 50                # The per-pixel baseline can only be used with a ResNet depth of 50 
-    if FLAGS.use_transformer_backbone: FLAGS.learning_rate /= 50            # The learning rate must be lower when using the larger transformer backbone
     if FLAGS.inference_only: FLAGS.num_epochs = 1                           # If we are only using inference, then we'll only run through one epoch
     return FLAGS
 
@@ -110,7 +109,8 @@ parser.add_argument("--batch_size", type=int, default=1, help="The batch size us
 parser.add_argument("--num_images", type=int, default=6, help="The number of images to display/segment. Default: 6")
 parser.add_argument("--display_rate", type=int, default=5, help="The epoch_rate of how often to display image segmentations. A display_rate of 3 means that every third epoch, visual segmentations are saved. Default: 25")
 parser.add_argument("--gpus_used", type=int, default=1, help="The number of GPU's to use for training. Only applicable for training with ADE20K. This input argument deprecates the '--num-gpus' argument. Default: 1")
-parser.add_argument("--num_epochs", type=int, default=5, help="The number of epochs to train the model for. Default: 1")
+parser.add_argument("--num_epochs", type=int, default=4, help="The number of epochs to train the model for. Default: 1")
+parser.add_argument("--warm_up_epochs", type=int, default=10, help="The number of epochs to warm up the learning rate when training. Will go from 1/100 '--learning_rate' to '--learning_rate' during these warm_up_epochs. Default: 10")
 parser.add_argument("--patience", type=int, default=6, help="The number of epochs to accept that the model hasn't improved before lowering the learning rate by a factor '--lr_gamma'. Default: 6")
 parser.add_argument("--early_stop_patience", type=int, default=15, help="The number of epochs to accept that the model hasn't improved before terminating training. Default: 15")
 parser.add_argument("--dice_loss_weight", type=int, default=10, help="The weighting for the dice loss in the loss function. Default: 10")
@@ -150,6 +150,11 @@ FLAGS.epoch_iter = int(np.floor(np.divide(FLAGS.num_train_files, FLAGS.batch_siz
 FLAGS.num_classes = len(MetadataCatalog[cfg.DATASETS.TRAIN[0]].stuff_classes)       # Get the number of classes in the current dataset
 cfg = changeConfig_withFLAGS(cfg=cfg, FLAGS=FLAGS)                          # Set the final values for the config
 
+# Change the config and add the FLAGS input arguments one by one ... Not pretty, but efficient and doesn't cost memory...
+cfg.custom_key = []
+for key in vars(FLAGS).keys():
+    cfg.custom_key.append(tuple((key, vars(FLAGS)[key])))
+
 
 # Create the log file
 log_file = os.path.join(cfg.OUTPUT_DIR, "Training_logs.txt")                # Initiate the log filename
@@ -160,6 +165,7 @@ start_time_readable = "{:s}:{:s} {:s}-{:s}-{:s}".format(start_time[:2], start_ti
 printAndLog(input_to_write="Training initiated at {:s}".format(start_time_readable).upper(), logs=log_file, prefix="", postfix="\n")
 printAndLog(input_to_write="FLAGS input arguments:", logs=log_file)
 printAndLog(input_to_write=vars(FLAGS), logs=log_file, oneline=False, length=27)
+
 
 # Return the values again
 def setup_func(): return FLAGS, cfg, log_file

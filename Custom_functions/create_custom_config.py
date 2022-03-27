@@ -55,9 +55,8 @@ def changeConfig_withFLAGS(cfg, FLAGS):
     if FLAGS.use_checkpoint == False: cfg.MODEL.WEIGHTS = ""                                # If the model must be trained without using earlier checkpoints, any earlier checkpoint must be removed...
     cfg.SOLVER.BASE_LR = FLAGS.learning_rate                                                # Starting learning rate
     cfg.SOLVER.IMS_PER_BATCH = FLAGS.batch_size                                             # Batch size used when training => batch_size pr GPU = batch_size // num_gpus
-    cfg.SOLVER.MAX_ITER = FLAGS.epoch_iter                                                  # <<< Deprecated input argument: Use --num_epochs instead >>>
-    # cfg.SOLVER.LR_SCHEDULER_NAME = "WarmupMultiStepLR"                                      # Default learning rate scheduler
-    cfg.SOLVER.LR_SCHEDULER_NAME = "WarmupCosineLR"                                      # Default learning rate scheduler
+    cfg.SOLVER.MAX_ITER = FLAGS.epoch_iter * 10                                             # <<< Deprecated input argument: Use --num_epochs instead >>>
+    cfg.SOLVER.LR_SCHEDULER_NAME = "WarmupCosineLR"                                         # Default learning rate scheduler
     cfg.SOLVER.OPTIMIZER = FLAGS.optimizer_used.upper()                                     # The optimizer to use for training the model
     cfg.SOLVER.NESTEROV = True                                                              # Whether or not the learning algorithm will use Nesterow momentum
     cfg.SOLVER.WEIGHT_DECAY = float(1e-4)                                                   # A small lambda value for the weight decay
@@ -78,7 +77,7 @@ def changeConfig_withFLAGS(cfg, FLAGS):
     cfg.MODEL.MASK_FORMER.NUM_OBJECT_QUERIES = FLAGS.num_queries                            # The number of queries to detect from the Transformer module 
     cfg.MODEL.SEM_SEG_HEAD.LOSS_WEIGHT = 2                                                  # Increase loss weight for the sem_seg_head
     cfg.TEST.EVAL_PERIOD = 0                                                                # We won't use the build in evaluation, only the custom evaluation function
-    cfg.SOLVER.CHECKPOINT_PERIOD = FLAGS.epoch_iter                                         # Save a new model checkpoint after each epoch, i.e. after everytime the entire trainining set has been seen by the model
+    cfg.SOLVER.CHECKPOINT_PERIOD = FLAGS.epoch_iter * 10                                    # Save a new model checkpoint after each epoch, i.e. after everytime the entire trainining set has been seen by the model
     cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST = 0.05                                            # Assign the IoU threshold used for the model
     cfg.INPUT.FORMAT = "BGR"                                                                # The input format is set to be BGR, like the visualization method
     cfg.OUTPUT_DIR = os.path.join(MaskFormer_dir, "output_"+FLAGS.output_dir_postfix)       # Get MaskFormer directory and name the output directory
