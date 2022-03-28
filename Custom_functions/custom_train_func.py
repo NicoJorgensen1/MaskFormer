@@ -29,6 +29,8 @@ def run_train_func(FLAGS, run_mode):
 
 # Function to launch the training
 def launch_custom_training(FLAGS, config, dataset, epoch=0, run_mode="train"):
+    config.SOLVER.MAX_ITER = FLAGS.epoch_iter * (25 if all(["train" in run_mode, epoch>0]) else 1)          # Increase training iteration count for precise BN computations
+    config.SOLVER.CHECKPOINT_PERIOD = config.SOLVER.MAX_ITER                                                # Save a new model checkpoint after each epoch
     if epoch==0 and "train" in run_mode: config.custom_key.append(tuple(("epoch_num", epoch)))              # Append the current epoch number to the custom_key list in the config ...
     if "train" in run_mode:                                                                                 # If we are training ... 
         for idx, item in enumerate(config.custom_key[::-1]):                                                # Iterate over the custom keys in reversed order

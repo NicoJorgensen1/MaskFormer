@@ -69,11 +69,11 @@ class My_GoTo_Trainer(DefaultTrainer):
             if "warm_up_epochs" in item[0]: warm_ups = item[1]                                                  # Get the wanted number of warm up epochs
         if warm_ups >= current_epoch:                                                                           # If we are still in the warm up phase ...
             learn_rates = np.linspace(start=np.divide(wanted_lr, 100), stop=wanted_lr, num=warm_ups+1)          # ... we'll create an array of the possible learning rates to choose from
-            learn_rates = np.multiply(learn_rates, 100)                                                         # For some reason necessary ... 
+            learn_rates = np.multiply(learn_rates, np.divide(1, wanted_lr))                                     # For some reason necessary ... 
             start_val = learn_rates[current_epoch-1]                                                            # ... and then choose the starting learning rate as the lower one
             end_val = learn_rates[current_epoch]                                                                # ... and then choose the next learning rate as the higher one
         elif warm_ups < current_epoch:                                                                          # Instead if we are in the regular training period ...
-            start_val, end_val = float(1), float(1)
+            start_val, end_val = float(1), float(1*0.5)                                                         # Then the learning rate will be cyclical between '--learning_rate' and '0.5 * --learning_rate'
         if "train" not in cfg.DATASETS.TRAIN[0]: start_val, end_val = 0, 0                                      # If we are using the validation or test set, then learning rates are set to 0
         sched = CosineParamScheduler2(start_value=start_val, end_value=end_val)
         scheduler = LRMultiplier(optimizer, multiplier=sched, max_iter=cfg.SOLVER.MAX_ITER)
@@ -166,18 +166,22 @@ class My_GoTo_Trainer(DefaultTrainer):
         cfg.defrost()
         cfg.DATALOADER.NUM_WORKERS = 0  # save some memory and time for PreciseBN
 
+        dataset_used = cfg.DATASETS.TRAIN[0]                                        # Get the current dataset
+        if "val" in dataset_used: cfg.TEST.PRECISE_BN.ENABLED = False               # If we are in validation, precise_bn is disabled
+        num_files = MetadataCatalog[dataset_used].num_files_in_dataset              # Read the number of files of the used dataset
+        max_iter = cfg.SOLVER.MAX_ITER                                              # Read the number of iterations in the current epoch
+        precise_bn_period = int(np.ceil(np.divide(max_iter, num_files)))            # Precise BN should be enabled after each epoch 
+
+
         ret = [
             hooks.IterationTimer(),
             hooks.LRScheduler(),
             hooks.PreciseBN(
-                int(np.ceil(cfg.SOLVER.MAX_ITER/15)),   # Run precise_BN after 2/3 of each epoch
-                self.model,                             # Assign the current model that must be used for the precise BN
-                self.build_train_loader(cfg),           # Build a new data loader to not affect training
-                int(np.ceil(cfg.SOLVER.MAX_ITER/15)),   # The number of iterations used to compute the precise values
-            )
-            if cfg.TEST.PRECISE_BN.ENABLED and get_bn_modules(self.model)
-            else None,
-        ]
+                precise_bn_period,                                                  # Run precise_BN after each epoch
+                self.model,                                                         # Assign the current model that must be used for the precise BN
+                self.build_train_loader(cfg),                                       # Build a new data loader to not affect training
+                precise_bn_period)                                                  # The number of iterations used to compute the precise values
+            if cfg.TEST.PRECISE_BN.ENABLED and get_bn_modules(self.model) else None]
 
         # Do PreciseBN before checkpointer, because it updates the model and need to be saved by checkpointer.
         # This is not always the best: if checkpointing has a different frequency, some checkpoints may have more precise statistics than others.

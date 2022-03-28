@@ -31,9 +31,12 @@ def createVitrolifeConfiguration(FLAGS):
     add_deeplab_config(cfg)                                                                 # Add some deeplab (i.e. sem_seg) config values
     add_mask_former_config(cfg)                                                             # Add some default values used for semantic segmentation to the config and choose datasetmapper
     if FLAGS.use_transformer_backbone==True and FLAGS.use_per_pixel_baseline==False:        # If the user chose the transformer backbone ...
-        cfg.merge_from_file(os.path.join(config_folder, "swin", "maskformer_swin_small_bs16_160k.yaml"))    # ... merge with the config for the small swin transformer
+        swin_type = "tiny" if "nico" in MaskFormer_dir.lower() else "base"                  # If on home computer, use swin tiny. If on gpucluster, use swin base
+        swin_config = [x for x in os.listdir(os.path.join(config_folder, "swin")) if all([swin_type in x, x.endswith(".yaml")])][-1]    # Find the corresponding swin config
+        cfg.merge_from_file(os.path.join(config_folder, "swin", swin_config))               # ... merge with the config for the chosen swin transformer
         if FLAGS.use_checkpoint==True:                                                      # If the user choose to start training from a earlier checkpoint ...
-            cfg.MODEL.WEIGHTS = os.path.join(checkpoint_dir, "maskformer_swin_small_checkpoint.pkl")    # Load the swin_transformer checkpoint
+            checkpoint_file = [x for x in os.listdir(checkpoint_dir) if all([swin_type in x, x.endswith(".pkl")])][-1]  # Find the checkpoint file for the chosen swin transformer
+            cfg.MODEL.WEIGHTS = os.path.join(checkpoint_dir, checkpoint_file)               # Load the swin_transformer checkpoint
     elif FLAGS.use_transformer_backbone==False and FLAGS.use_per_pixel_baseline==False:     # Else-if the user will use regular ResNet backbone ...
         cfg.merge_from_file(os.path.join(config_folder, "maskformer_R"+"{:d}".format(FLAGS.resnet_depth)+"_bs16_160k.yaml"))  # ... merge with the ResNet_maskformer config
         cfg.MODEL.RESNETS.DEPTH = FLAGS.resnet_depth                                        # Assign the depth of the ResNet backbone feature extracting model
@@ -55,7 +58,7 @@ def changeConfig_withFLAGS(cfg, FLAGS):
     if FLAGS.use_checkpoint == False: cfg.MODEL.WEIGHTS = ""                                # If the model must be trained without using earlier checkpoints, any earlier checkpoint must be removed...
     cfg.SOLVER.BASE_LR = FLAGS.learning_rate                                                # Starting learning rate
     cfg.SOLVER.IMS_PER_BATCH = FLAGS.batch_size                                             # Batch size used when training => batch_size pr GPU = batch_size // num_gpus
-    cfg.SOLVER.MAX_ITER = FLAGS.epoch_iter * 10                                             # <<< Deprecated input argument: Use --num_epochs instead >>>
+    cfg.SOLVER.MAX_ITER = FLAGS.epoch_iter                                                  # <<< Deprecated input argument: Use --num_epochs instead >>>
     cfg.SOLVER.LR_SCHEDULER_NAME = "WarmupCosineLR"                                         # Default learning rate scheduler
     cfg.SOLVER.OPTIMIZER = FLAGS.optimizer_used.upper()                                     # The optimizer to use for training the model
     cfg.SOLVER.NESTEROV = True                                                              # Whether or not the learning algorithm will use Nesterow momentum
@@ -77,7 +80,7 @@ def changeConfig_withFLAGS(cfg, FLAGS):
     cfg.MODEL.MASK_FORMER.NUM_OBJECT_QUERIES = FLAGS.num_queries                            # The number of queries to detect from the Transformer module 
     cfg.MODEL.SEM_SEG_HEAD.LOSS_WEIGHT = 2                                                  # Increase loss weight for the sem_seg_head
     cfg.TEST.EVAL_PERIOD = 0                                                                # We won't use the build in evaluation, only the custom evaluation function
-    cfg.SOLVER.CHECKPOINT_PERIOD = FLAGS.epoch_iter * 10                                    # Save a new model checkpoint after each epoch, i.e. after everytime the entire trainining set has been seen by the model
+    cfg.SOLVER.CHECKPOINT_PERIOD = FLAGS.epoch_iter                                         # Save a new model checkpoint after each epoch, i.e. after everytime the entire trainining set has been seen by the model
     cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST = 0.05                                            # Assign the IoU threshold used for the model
     cfg.INPUT.FORMAT = "BGR"                                                                # The input format is set to be BGR, like the visualization method
     cfg.OUTPUT_DIR = os.path.join(MaskFormer_dir, "output_"+FLAGS.output_dir_postfix)       # Get MaskFormer directory and name the output directory
