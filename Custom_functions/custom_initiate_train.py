@@ -102,10 +102,10 @@ if FLAGS.debugging == False and "vitrolife" in FLAGS.dataset_name.lower():      
     eval_test_results,_,_,conf_matrix_test = evaluateResults(FLAGS, cfg, data_split="test") # Evaluate the result metrics on the validation set with the best performing model
     _ = plot_confusion_matrix(config=cfg, conf_train=conf_matrix_train, conf_val=conf_matrix_val, conf_test=conf_matrix_test, done_training=True)
     test_pq_results = pq_evaluation(args=FLAGS, config=cfg, data_split="test")      # Evaluate the Panoptic Quality for the test semantic segmentation results
-    history = combineDataToHistoryDictionaryFunc(config=cfg, eval_metrics=eval_test_results["sem_seg"], pq_metrics=test_pq_results, data_split="test", history=history)
+    history_test = combineDataToHistoryDictionaryFunc(config=cfg, eval_metrics=eval_test_results["sem_seg"], pq_metrics=test_pq_results, data_split="test")
     test_history = {}                                                               # Initialize the test_history dictionary as an empty dictionary
-    for key in history.keys():                                                      # Iterate over all the keys in the history dictionary
-        if "test" in key: test_history[key] = history[key][-1]                      # If "test" is in the key, assign the value to the test_dictionary 
+    for key in history_test.keys():                                                 # Iterate over all the keys in the history dictionary
+        if "test" in key: test_history[key] = history_test[key][-1]                 # If "test" is in the key, assign the value to the test_dictionary 
 
 # Print and log the best metric results
 printAndLog(input_to_write="Final results:".upper(), logs=log_file)
