@@ -1,35 +1,40 @@
 # Import libraries 
+from random import choices
 import shutil                                                                                               # Used to copy/rename the metrics.json file after each training/validation step
-import os
-from copy import deepcopy
+import os                                                                                                   # For joining paths
+import numpy as np 
+from time import time                                                                                       # Used to time the epoch/training duration
+from copy import  deepcopy
 from detectron2.utils import comm
-from detectron2.checkpoint import DetectionCheckpointer
-from detectron2.engine import default_setup
 from detectron2.utils.logger import setup_logger
 from custom_goto_trainer_class import My_GoTo_Trainer
-from visualize_image_batch import putModelWeights
-
+from visualize_image_batch import putModelWeights                                                           # Assign the latest model checkpoint to the config model.weights 
+from custom_setup_func import SaveHistory, printAndLog                                                      # Save history_dict, log results
+from create_custom_config import createVitrolifeConfiguration, changeConfig_withFLAGS                       # Create the config used for hyperparameter optimization 
+from visualize_image_batch import visualize_the_images                                                      # Functions visualize the image batch
+from show_learning_curves import show_history, combineDataToHistoryDictionaryFunc                           # Function used to plot the learning curves for the given training and to add results to the history dictionary
+from custom_evaluation_func import evaluateResults                                                          # Function to evaluate the metrics for the segmentation
+from custom_callback_functions import early_stopping, lr_scheduler, keepAllButLatestAndBestModel, updateLogsFunc    # Callback functions for model training
+from custom_pq_eval_func import pq_evaluation                                                               # Used to perform the panoptic quality evaluation on the semantic segmentation results
+from visualize_conf_matrix import plot_confusion_matrix                                                     # Function to plot the available confusion matrixes
 
 def setup(FLAGS):
     cfg = FLAGS.config                                                                                      # Create the custom config as an independent file
-    default_setup(cfg, FLAGS)
-    # Setup logger for "mask_former" module
-    setup_logger(output=cfg.OUTPUT_DIR, distributed_rank=comm.get_rank(), name="mask_former")
-    return cfg
+    setup_logger(output=cfg.OUTPUT_DIR, distributed_rank=comm.get_rank(), name="mask_former")               # Setup a logger for the mask module
+    return cfg                                                                                              # Return the completed configuration
 
 
 def run_train_func(FLAGS, run_mode):
     cfg = setup(FLAGS)
-
-    # if trainer is None:
     Trainer = My_GoTo_Trainer(cfg)
     Trainer.resume_or_load(resume=False)
     return Trainer.train()
 
 
 # Function to launch the training
-def launch_custom_training(FLAGS, config, dataset, epoch=0, run_mode="train"):
-    config.SOLVER.MAX_ITER = FLAGS.epoch_iter * (25 if all(["train" in run_mode, epoch>0]) else 1)          # Increase training iteration count for precise BN computations
+def launch_custom_training(FLAGS, config, dataset, epoch=0, run_mode="train", hyperparameter_opt=False):
+    config.SOLVER.MAX_ITER = FLAGS.epoch_iter * (20 if all(["train" in run_mode, epoch>0]) else 1)          # Increase training iteration count for precise BN computations
+    if hyperparameter_opt and "train" in run_mode: config.SOLVER.MAX_ITER = int(FLAGS.epoch_iter * 1)       # If we are optimizing hyperparameters, the epochs won't be that long...
     config.SOLVER.CHECKPOINT_PERIOD = config.SOLVER.MAX_ITER                                                # Save a new model checkpoint after each epoch
     if epoch==0 and "train" in run_mode: config.custom_key.append(tuple(("epoch_num", epoch)))              # Append the current epoch number to the custom_key list in the config ...
     if "train" in run_mode:                                                                                 # If we are training ... 
@@ -50,3 +55,109 @@ def launch_custom_training(FLAGS, config, dataset, epoch=0, run_mode="train"):
         os.path.join(config.OUTPUT_DIR, "model_epoch_{:d}.pth".format(epoch+1)))                            # ... where X is the current epoch number    
     [os.remove(os.path.join(config.OUTPUT_DIR, x)) for x in os.listdir(config.OUTPUT_DIR) if "model_" in x and "epoch" not in x and x.endswith(".pth")]  # Remove all irrelevant models
     return config
+
+
+# Create function to train the objective function
+def objective_train_func(trial, FLAGS=None, cfg=None, logs=None, data_batches=None, hyperparameter_optimization=False):
+    # Setup training variables before starting training
+    printAndLog(input_to_write="Start {:s}...".format("inference" if FLAGS.inference_only else "training").upper(), logs=logs)
+    train_loader, val_loader, train_evaluator, val_evaluator, history = None, None, None, None, None        # Initiates all the loaders, evaluators and history as None type objects
+    train_mode = "min" if "loss" in FLAGS.eval_metric else "max"                                            # Compute the mode of which the performance should be measured. Either a negative or a positive value is better
+    new_best = np.inf if train_mode=="min" else -np.inf                                                     # Initiate the original "best_value" as either infinity or -infinity according to train_mode
+    best_epoch = 0                                                                                          # Initiate the best epoch as being epoch_0, i.e. before doing any model training
+    eval_train_results = {"sem_seg": []}                                                                    # Set the training evaluation results as an empty dictionary 
+    train_pq_results = {}                                                                                   # Set training PQ results to be an empty dictionary
+    conf_matrix_train, conf_matrix_val, conf_matrix_test = None, None, None                                 # Initialize the confusion matrixes as None values 
+    train_dataset = cfg.DATASETS.TRAIN                                                                      # Get the training dataset name
+    val_dataset = cfg.DATASETS.TEST                                                                         # Get the validation dataset name
+    lr_update_check = np.zeros((FLAGS.patience, 1), dtype=bool)                                             # Preallocating array to determine whether or not the learning rate was updated
+    quit_training = False                                                                                   # Boolean value determining whether or not to commit early stopping
+    epochs_to_run = 2 if hyperparameter_optimization else FLAGS.num_epochs                                  # We'll run only two epochs if we
+    train_start_time = time()                                                                               # Now the training starts
+
+    # If we are performing hyperparameter optimization, the config should be updated
+    if hyperparameter_optimization==True and trial is not None:
+        lr = trial.suggest_float(name="learning_rate", low=1e-7, high=1e-2)
+        batch_size = trial.suggest_int(name="batch_size", low=1, high=20)
+        optimizer_used = trial.categorical(name="optimizer", choices=["ADAMW", "SGD"])
+        weight_decay = trial.suggest_float(name="weight_decay", low=1e-7, high=1e-2)
+        backbone_multiplier = trial.suggest_float("backbone_lr_multiplier", low=1e-3, high=0.5)
+        dice_loss_weight = trial.suggest_int(name="dice_loss_weight", low=2, high=25)
+        mask_loss_weight = trial.suggest_int(name="mask_loss_weight", low=2, high=25)
+        dropout = trial.suggest_float(name="dropout", low=1e-5, high=0.5)
+        num_queries = trial.suggest_int(name="num_queries", low=10, high=125)
+        use_checkpoint = trial.suggest_categorical(name="checkpoint", choices=["True", "False"])
+        backbone = trial.suggest_categorical(name="backbone", choices=["swin", "resnet", "per_pixel"])
+
+        # Change the FLAGS parameters and then change the config
+        FLAGS.learning_rate = lr
+        FLAGS.batch_size = batch_size
+        FLAGS.optimizer_used = optimizer_used
+        FLAGS.weight_decay = weight_decay
+        FLAGS.backbone_multiplier = backbone_multiplier 
+        FLAGS.dice_loss_weight = dice_loss_weight
+        FLAGS.mask_loss_weight = mask_loss_weight
+        FLAGS.dropout = dropout
+        FLAGS.num_queries = num_queries
+        FLAGS.use_checkpoint = bool(use_checkpoint)
+        FLAGS.use_transformer_backbone = False
+        FLAGS.use_per_pixel_baseline = False
+        if "swin" in backbone: FLAGS.use_transformer_backbone = True
+        if "per_pixel" in backbone: FLAGS.use_per_pixel_baseline = True
+        if "resnet" in backbone: 
+            resnet_depth = trial.suggest_categorical(name="Resnet_depth", choices=[18, 34, 50, 101])
+            FLAGS.resnet_depth = resnet_depth
+        config = createVitrolifeConfiguration(FLAGS=FLAGS)
+        config = changeConfig_withFLAGS(cfg=config, FLAGS=FLAGS)
+    else: config = deepcopy(cfg)
+    
+    # Train the model 
+    for epoch in range(epochs_to_run):                                                                      # Iterate over the chosen amount of epochs
+        epoch_start_time = time()                                                                           # Now this new epoch starts
+        if FLAGS.inference_only==False:
+            config = launch_custom_training(FLAGS=FLAGS, config=config, dataset=train_dataset, epoch=epoch, run_mode="train", hyperparameter_opt=hyperparameter_optimization)   # Launch the training loop for one epoch
+            if hyperparameter_optimization==False:
+                eval_train_results, train_loader, train_evaluator, conf_matrix_train = evaluateResults(FLAGS, config, data_split="train", dataloader=train_loader, evaluator=train_evaluator)   # Evaluate the result on the training set
+                train_pq_results = pq_evaluation(args=FLAGS, config=config, data_split="train")             # Evaluate the Panoptic Quality for the training semantic segmentation results
+
+        # Validation period. Will 'train' with lr=0 on validation data, correct the metrics files and evaluate performance on validation data
+        config = launch_custom_training(FLAGS=FLAGS, config=config, dataset=val_dataset, epoch=epoch, run_mode="val", hyperparameter_opt=hyperparameter_optimization)   # Launch the training loop for one epoch
+        eval_val_results, val_loader, val_evaluator, conf_matrix_val = evaluateResults(FLAGS, config, data_split="val", dataloader=val_loader, evaluator=val_evaluator) # Evaluate the result metrics on the training set
+        if hyperparameter_optimization==False:                                                              # If we are not performing hyperparameter optimization ...
+            val_pq_results = pq_evaluation(args=FLAGS, config=config, data_split="val")                     # ... evaluate the Panoptic Quality for the validation semantic segmentation results
+        
+            # Prepare for the training phase of the next epoch. Switch back to training dataset, save history and learning curves and visualize segmentation results
+            history = show_history(config=config, FLAGS=FLAGS, metrics_train=eval_train_results["sem_seg"], # Create and save the learning curves ...
+                metrics_eval=eval_val_results["sem_seg"], history=history, pq_train=train_pq_results, pq_val=val_pq_results)    # ... including all training and validation metrics
+            SaveHistory(historyObject=history, save_folder=config.OUTPUT_DIR)                               # Save the history dictionary after each epoch
+            [os.remove(os.path.join(config.OUTPUT_DIR, x)) for x in os.listdir(config.OUTPUT_DIR) if "events.out.tfevent" in x]
+            if np.mod(np.add(epoch,1), FLAGS.display_rate) == 0:                                            # Every 'display_rate' epochs, the model will segment the same images again ...
+                _,data_batches,config,FLAGS = visualize_the_images(config=config, FLAGS=FLAGS, data_batches=data_batches, epoch_num=epoch+1)  # ... segment and save visualizations
+                _ = plot_confusion_matrix(config=config, epoch=epoch+1, conf_train=conf_matrix_train, conf_val=conf_matrix_val)
+        
+            # Performing callbacks
+            if FLAGS.inference_only==False: 
+                config = keepAllButLatestAndBestModel(cfg=config, history=history, FLAGS=FLAGS)             # Keep only the best and the latest model weights. The rest are deleted.
+                if epoch+1 >= FLAGS.patience:                                                               # If the model has trained for more than 'patience' epochs and we aren't debugging ...
+                    config, lr_update_check = lr_scheduler(cfg=config, history=history, FLAGS=FLAGS, lr_updated=lr_update_check)  # ... change the learning rate, if needed
+                    FLAGS.learning_rate = config.SOLVER.BASE_LR                                             # Update the FLAGS.learning_rate value
+                if epoch+1 >= FLAGS.early_stop_patience:                                                    # If the model has trained for more than 'early_stopping_patience' epochs ...
+                    quit_training = early_stopping(history=history, FLAGS=FLAGS)                            # ... perform the early stopping callback
+        new_best, best_epoch = updateLogsFunc(log_file=logs, FLAGS=FLAGS, history=history, best_val=new_best, train_start=train_start_time, epoch_start=epoch_start_time, best_epoch=best_epoch)
+        if quit_training == True: break                                                                     # If the early stopping callback says we need to quit the training, break the for loop and stop running more epochs
+
+    # Evaluation on the vitrolife test dataset. There is no ADE20K-test dataset.
+    if all([FLAGS.debugging == False, "vitrolife" in FLAGS.dataset_name.lower(), hyperparameter_optimization==False]):  # Inference will only be performed when training the Vitrolife model
+        config.DATASETS.TEST = ("vitrolife_dataset_test",)                                                  # The inference will be done on the test dataset
+        eval_test_results,_,_,conf_matrix_test = evaluateResults(FLAGS, config, data_split="test")          # Evaluate the result metrics on the validation set with the best performing model
+        _ = plot_confusion_matrix(config=config, conf_train=conf_matrix_train, conf_val=conf_matrix_val, conf_test=conf_matrix_test, done_training=True)
+        test_pq_results = pq_evaluation(args=FLAGS, config=config, data_split="test")                       # Evaluate the Panoptic Quality for the test semantic segmentation results
+        history_test = combineDataToHistoryDictionaryFunc(config=config, eval_metrics=eval_test_results["sem_seg"], pq_metrics=test_pq_results, data_split="test")
+        test_history = {}                                                                                   # Initialize the test_history dictionary as an empty dictionary
+        for key in history_test.keys():                                                                     # Iterate over all the keys in the history dictionary
+            if "test" in key: test_history[key] = history_test[key][-1]                                     # If "test" is in the key, assign the value to the test_dictionary 
+
+    # Return the results
+    if hyperparameter_optimization: return new_best
+    else: return history, test_history, new_best, best_epoch, config
+    

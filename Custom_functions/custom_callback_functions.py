@@ -95,9 +95,9 @@ def updateLogsFunc(log_file, FLAGS, history, best_val, train_start, epoch_start,
     train_mode = "min" if "loss" in FLAGS.eval_metric else "max"
     printAndLog(input_to_write=string1, logs=log_file, prefix="\n", postfix="\n")
     printAndLog(input_to_write="Train metrics:".ljust(25), logs=log_file, prefix="", postfix="")
-    printAndLog(input_to_write=metrics_train, logs=log_file, oneline=True, prefix="", postfix="\n")
+    printAndLog(input_to_write=metrics_train, logs=log_file, oneline=True, prefix="", postfix="\n", length=27)
     printAndLog(input_to_write="Validation metrics:".ljust(25), logs=log_file, prefix="")
-    printAndLog(input_to_write=metrics_val, logs=log_file, oneline=True, prefix="", postfix="\n")
+    printAndLog(input_to_write=metrics_val, logs=log_file, oneline=True, prefix="", postfix="\n", length=27)
     if train_mode=="min": new_best = np.min(history[FLAGS.eval_metric])
     if train_mode=="max": new_best = np.max(history[FLAGS.eval_metric])
     if np.abs(new_best-best_val) >= FLAGS.min_delta:
@@ -107,8 +107,5 @@ def updateLogsFunc(log_file, FLAGS, history, best_val, train_start, epoch_start,
     if epoch < FLAGS.num_epochs:
         printAndLog(input_to_write=string2, logs=log_file, prefix="")
     return best_val, best_epoch
-
-
-
 
 

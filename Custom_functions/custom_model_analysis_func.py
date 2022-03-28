@@ -36,7 +36,7 @@ def setup(args, config):
     return config
 
 
-def do_flop(cfg):
+def do_flop(cfg, args):
     data_loader = build_detection_test_loader(cfg, cfg.DATASETS.TEST[0])
     model = build_model(cfg)
     DetectionCheckpointer(model).load(cfg.MODEL.WEIGHTS)
@@ -63,10 +63,10 @@ def do_flop(cfg):
     logger.info(
         "Total GFlops: {:.1f}±{:.1f}".format(np.mean(total_flops) / 1e9, np.std(total_flops) / 1e9)
     )
-    return "Total GFlops: {:.1f} ±{:.1f}".format(np.mean(total_flops) / 1e9, np.std(total_flops) / 1e9)
+    return "{:.1f} ±{:.1f}".format(np.mean(total_flops) / 1e9, np.std(total_flops) / 1e9)
 
 
-def do_activation(cfg):
+def do_activation(cfg, args):
     data_loader = build_detection_test_loader(cfg, cfg.DATASETS.TEST[0])
     model = build_model(cfg)
     DetectionCheckpointer(model).load(cfg.MODEL.WEIGHTS)
@@ -87,7 +87,7 @@ def do_activation(cfg):
             np.mean(total_activations), np.std(total_activations)
         )
     )
-    return "Total Activations: {:.3f}M ±{}".format(np.mean(total_activations), np.std(total_activations))
+    return "{:.3f}M ±{}".format(np.mean(total_activations), np.std(total_activations))
 
 
 def do_parameter(cfg):
@@ -105,38 +105,37 @@ def do_structure(cfg):
 
 # if __name__ == "__main__":
 def analyze_model_func(config):
-    if __name__ == "__main__":
-        parser = default_argument_parser()
-        parser.add_argument(
-            "--tasks",
-            choices=["flop", "activation", "parameter", "structure"],
-            default=["flop", "activation", "parameter"],
-            required=False,
-            nargs="+",
-        )
-        parser.add_argument(
-            "-n",
-            "--num-inputs",
-            default=1,
-            type=int,
-            help="number of inputs used to compute statistics for flops/activations, "
-            "both are data dependent.",
-        )
-        parser.add_argument(
-            "--use-fixed-input-size",
-            action="store_true",
-            help="use fixed input size when calculating flops",
-        )
-        args = parser.parse_args()
-        assert not args.eval_only
-        assert args.num_gpus == 1
+    parser = default_argument_parser()
+    parser.add_argument(
+        "--tasks",
+        choices=["flop", "activation", "parameter", "structure"],
+        default=["flop", "activation", "parameter"],
+        required=False,
+        nargs="+",
+    )
+    parser.add_argument(
+        "-n",
+        "--num-inputs",
+        default=1,
+        type=int,
+        help="number of inputs used to compute statistics for flops/activations, "
+        "both are data dependent.",
+    )
+    parser.add_argument(
+        "--use-fixed-input-size",
+        action="store_true",
+        help="use fixed input size when calculating flops",
+    )
+    args = parser.parse_args()
+    assert not args.eval_only
+    assert args.num_gpus == 1
 
-        config = setup(args, config)
-        
-        # for task in args.tasks:
-        res = { "Flops": do_flop(config),
-                "Parameters": "".join([x.strip() for x in do_parameter(config).split("|")[8]]),
-                "Activations": do_activation(config)}
+    config = setup(args, config)
+    
+    # for task in args.tasks:
+    res = { "Parameters": "".join([x.strip() for x in do_parameter(config).split("|")[8]]),
+            "Total GFlops": do_flop(config, args),
+            "Activations": do_activation(config, args)}
     return res
 
 # from copy import deepcopy
