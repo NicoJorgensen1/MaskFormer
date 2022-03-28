@@ -79,10 +79,10 @@ def changeFLAGS(FLAGS):
 # Define a function to extract the final results that will be printed in the log file
 def getBestEpochResults(history, best_epoch):
     val_to_keep = {}
-    final_epoch_idx = np.max(np.argwhere(history["val_epoch_num"]==best_epoch))
-    keys_to_use = sorted([x for x in history.keys() if all(["val" in x, x[-2]!="_"]) and any([y in x for y in ["SQ", "RQ", "PQ", "IoU", "ACC", "loss"]])], key=str.lower)
+    best_epoch_idx = np.max(np.argwhere(history["val_epoch_num"]==best_epoch))
+    keys_to_use = sorted([x for x in history.keys() if all(["val" in x, "_C" not in x, "_"!=x[-3]]) and any([y in x for y in ["SQ", "RQ", "PQ", "IoU", "ACC", "loss"]])], key=str.lower)
     for key in keys_to_use:
-        if "loss" in key: val_to_keep[key] = history[key][final_epoch_idx]
+        if "loss" in key: val_to_keep[key] = history[key][best_epoch_idx]
         if "loss" not in key: val_to_keep[key] = history[key][best_epoch-1]
     return val_to_keep
 
