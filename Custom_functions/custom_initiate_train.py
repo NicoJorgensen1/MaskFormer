@@ -25,6 +25,7 @@ os.environ["DETECTRON2_DATASETS"] = dataset_dir
 # Import important libraries
 import numpy as np                                                                  # Used for algebraic equations
 from time import time                                                               # Used to time the epoch/training duration
+from copy import deepcopy
 from custom_setup_func import setup_func, zip_output, SaveHistory, printAndLog, getBestEpochResults # Assign to GPU, register vitrolife dataset, create config, zip output_dir, save history_dict, log results, get best results
 from custom_train_func import launch_custom_training                                # Function to launch the training with the given dataset
 from visualize_image_batch import visualize_the_images                              # Functions visualize the image batch
@@ -33,10 +34,11 @@ from custom_evaluation_func import evaluateResults                              
 from custom_callback_functions import early_stopping, lr_scheduler, keepAllButLatestAndBestModel, computeRemainingTime, updateLogsFunc  # Callback functions for model training
 from custom_pq_eval_func import pq_evaluation                                       # Used to perform the panoptic quality evaluation on the semantic segmentation results
 from visualize_conf_matrix import plot_confusion_matrix                             # Function to plot the available confusion matrixes
+from analyze_model import analyze_model_func
 
-
-# Get the FLAGS and config variables
+# Get the FLAGS and config variables and analyze the model
 FLAGS, cfg, log_file = setup_func()
+model_analysis = analyze_model_func(config=deepcopy(cfg))
 
 # Create properties
 train_trainer, val_trainer = None, None
