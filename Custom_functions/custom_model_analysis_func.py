@@ -2,7 +2,6 @@
 # Copyright (c) Facebook, Inc. and its affiliates.
 # Modified by Bowen Cheng from https://github.com/facebookresearch/detectron2/blob/main/tools/analyze_model.py
 
-from distutils.command.config import config
 import logging
 import numpy as np
 from collections import Counter
@@ -10,7 +9,7 @@ import tqdm
 from fvcore.nn import flop_count_table  # can also try flop_count_str
 
 from detectron2.checkpoint import DetectionCheckpointer
-from detectron2.config import CfgNode, instantiate
+from detectron2.config import CfgNode
 from detectron2.data import build_detection_test_loader
 from detectron2.engine import default_argument_parser
 from detectron2.modeling import build_model
@@ -21,17 +20,15 @@ from detectron2.utils.analysis import (
 )
 from detectron2.utils.logger import setup_logger
 
-# fmt: off
 import os
 import sys
 sys.path.insert(1, os.path.join(sys.path[0], '..'))
-# fmt: on
 
 logger = logging.getLogger("detectron2")
 
 
 def setup(args, config):
-    setup_logger(name="fvcore", output=os.path.join(config.OUTPUT_DIR, "analyze_model_output.txt"))
+    setup_logger(name="fvcore")
     setup_logger()
     return config
 

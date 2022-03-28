@@ -83,15 +83,15 @@ def combineDataToHistoryDictionaryFunc(config, eval_metrics=None, pq_metrics=Non
     if history == None: history = {}                                                                    # Initiate the history dictionary that will be used
     if "train" in data_split: json_metrics = load_json_metrics(config=config, data_split="train")       # Load the metrics into the history dictionary
     if "val" in data_split: json_metrics = load_json_metrics(config=config, data_split="val")           # Load the metrics into the history dictionary
-    if json_metrics != None:                                                                            # If the json metrics has been loaded ...
+    if json_metrics is not None:                                                                        # If the json metrics has been loaded ...
         for key in json_metrics: history[data_split+"_"+key] = json_metrics[key]                        # ... append all the metrics losses to the dictionary with the split prefix on the key
-    if eval_metrics != None:                                                                            # If any evaluation metrics are available
+    if eval_metrics is not None:                                                                        # If any evaluation metrics are available
         for key in eval_metrics.keys():                                                                 # Iterate over all keys in the history
             old_key = deepcopy(key)                                                                     # Make a copy now of the original key name from the metrics_train/eval dictionary
             key = changeClassNameForClassIdxFunc(key=key, config=config)                                # Exchange class_name with class_label in the key-name
             if data_split+"_"+key not in history: history[data_split+"_"+key] = list()                  # If the given key doesn't exist add the key with ...
             history[data_split+"_"+key].append(eval_metrics[old_key])                                   # Append the current key-value from the metrics_train
-    if pq_metrics != None:                                                                              # If any panoptic quality metrics are available ...
+    if pq_metrics is not None:                                                                          # If any panoptic quality metrics are available ...
         for master_key in pq_metrics.keys():                                                            # Iterate over all keys in the PQ results ...
             if "all" in master_key.lower():                                                             # Available master_keys are ['All', 'per_class', 'Stuff']. All and Stuff are identical (at least AFAIK)
                 for key in pq_metrics[master_key].keys():                                               # ... each element in the PQ_results is a new dictionary
@@ -115,7 +115,8 @@ def show_history(config, FLAGS, metrics_train, metrics_eval, pq_train, pq_val, h
     Pixel Accuracy (pACC)
     """
     # Create history and list of relevant history keys
-    if FLAGS.inference_only==False: history = combineDataToHistoryDictionaryFunc(config=config, eval_metrics=metrics_train, pq_metrics=pq_train, data_split="train", history=history)
+    if FLAGS.inference_only==False or FLAGS.hp_optim==False:
+        history = combineDataToHistoryDictionaryFunc(config=config, eval_metrics=metrics_train, pq_metrics=pq_train, data_split="train", history=history)
     history = combineDataToHistoryDictionaryFunc(config=config, eval_metrics=metrics_eval, pq_metrics=pq_val, data_split="val", history=history)
     hist_keys = extractRelevantHistoryKeys(history)
     ax_titles = ["Total_loss", "mIoU and fwIoU", "PQ, RQ, SQ", "mACC and pACC", "Loss_CE", "Loss_DICE", "Loss_Mask",        # Create titles and ylabels ...

@@ -36,7 +36,7 @@ def printAndLog(input_to_write, logs, print_str=True, write_input_to_log=True, p
                 if val == "": val = "None"                                  # If the value is empty, let it be "None"
                 key = key + ": "                                            # Add the colon to the key
                 if length != None: key = key.ljust(length)                  # If any length has been chosen by the user, pad the key-name string to that specific length
-                string = "{:s}{:s}{:s}".format(key, val.ljust(11), "||\t" if oneline else "\n") # Create the string to print and log
+                string = "{:s}{:s}{:s}".format(key, val.ljust(9), "||".ljust(5) if oneline else "\n")   # Create the string to print and log
                 if write_input_to_log: logs.writelines(string)              # ... If the string needs to be logged, log the key-value pairs on the same line ...
                 if print_str: print(string, end="\t" if oneline else "")    # ... and print it if chosen ...
         if write_input_to_log: logs.writelines("{:s}".format(postfix))      # ... before writing the postfix 
@@ -79,7 +79,7 @@ def changeFLAGS(FLAGS):
 # Define a function to extract the final results that will be printed in the log file
 def getBestEpochResults(history, best_epoch):
     val_to_keep = {}
-    best_epoch_idx = np.max(np.argwhere(history["val_epoch_num"]==best_epoch))
+    best_epoch_idx = np.max(np.argwhere(np.isin(history["val_epoch_num"], best_epoch)))
     keys_to_use = sorted([x for x in history.keys() if all(["val" in x, "_C" not in x, "_"!=x[-3], "_"!=x[-2]]) and any([y in x for y in ["SQ", "RQ", "PQ", "IoU", "ACC", "loss"]])], key=str.lower)
     for key in keys_to_use:
         if "loss" in key: val_to_keep[key] = history[key][best_epoch_idx]
@@ -110,7 +110,7 @@ parser.add_argument("--num_images", type=int, default=6, help="The number of ima
 parser.add_argument("--display_rate", type=int, default=1, help="The epoch_rate of how often to display image segmentations. A display_rate of 3 means that every third epoch, visual segmentations are saved. Default: 25")
 parser.add_argument("--gpus_used", type=int, default=1, help="The number of GPU's to use for training. Only applicable for training with ADE20K. This input argument deprecates the '--num-gpus' argument. Default: 1")
 parser.add_argument("--num_epochs", type=int, default=6, help="The number of epochs to train the model for. Default: 1")
-parser.add_argument("--warm_up_epochs", type=int, default=5, help="The number of epochs to warm up the learning rate when training. Will go from 1/100 '--learning_rate' to '--learning_rate' during these warm_up_epochs. Default: 10")
+parser.add_argument("--warm_up_epochs", type=int, default=1, help="The number of epochs to warm up the learning rate when training. Will go from 1/100 '--learning_rate' to '--learning_rate' during these warm_up_epochs. Default: 1")
 parser.add_argument("--patience", type=int, default=2, help="The number of epochs to accept that the model hasn't improved before lowering the learning rate by a factor '--lr_gamma'. Default: 6")
 parser.add_argument("--early_stop_patience", type=int, default=9, help="The number of epochs to accept that the model hasn't improved before terminating training. Default: 15")
 parser.add_argument("--dice_loss_weight", type=int, default=10, help="The weighting for the dice loss in the loss function. Default: 10")
@@ -122,6 +122,7 @@ parser.add_argument("--dropout", type=float, default=0.10, help="The dropout rat
 parser.add_argument("--weight_decay", type=float, default=1e-4, help="The weight decay used for the model. Default: 1e-4")
 parser.add_argument("--min_delta", type=float, default=5e-4, help="The minimum improvement the model must have made in order to be accepted as an actual improvement. Default 5e-4")
 parser.add_argument("--crop_enabled", type=str2bool, default=True, help="Whether or not cropping is allowed on the images. Default: True")
+parser.add_argument("--hp_optim", type=str2bool, default=True, help="Whether or not we are initiating the training with a hyperparameter optimization. Default: True")
 parser.add_argument("--inference_only", type=str2bool, default=False, help="Whether or not training is skipped and only inference is run. This input argument deprecates the '--eval_only' argument. Default: False")
 parser.add_argument("--display_images", type=str2bool, default=False, help="Whether or not some random sample images are displayed before training starts. Default: False")
 parser.add_argument("--use_checkpoint", type=str2bool, default=False, help="Whether or not we are loading weights from a model checkpoint file before training. Default: False")
@@ -150,12 +151,8 @@ FLAGS.num_val_files = MetadataCatalog[cfg.DATASETS.TEST[0]].num_files_in_dataset
 if FLAGS.batch_size > FLAGS.num_train_files: FLAGS.batch_size = FLAGS.num_train_files   # The batch size can't be greater than the number of files in the dataset
 FLAGS.epoch_iter = int(np.floor(np.divide(FLAGS.num_train_files, FLAGS.batch_size)))# Compute the number of iterations per training epoch
 FLAGS.num_classes = len(MetadataCatalog[cfg.DATASETS.TRAIN[0]].stuff_classes)       # Get the number of classes in the current dataset
+FLAGS.HPO_trial = 1                                                         # A counter for the number of trials of hyperparameter optimization performed 
 cfg = changeConfig_withFLAGS(cfg=cfg, FLAGS=FLAGS)                          # Set the final values for the config
-
-# Change the config and add the FLAGS input arguments one by one ... Not pretty, but efficient and doesn't cost memory...
-cfg.custom_key = []
-for key in vars(FLAGS).keys():
-    cfg.custom_key.append(tuple((key, vars(FLAGS)[key])))
 
 
 # Create the log file

@@ -81,30 +81,30 @@ def computeRemainingTime(epoch=0, num_epochs=None, train_start_time=time(), epoc
     return string1, string2
 
 # Write to the log file if the model has improved
-def updateLogsFunc(log_file, FLAGS, history, best_val, train_start, epoch_start, best_epoch):
-    epoch = np.max(history["train_epoch_num"])
+def updateLogsFunc(log_file, FLAGS, history, best_val, train_start, epoch_start, best_epoch, cur_epoch):
+    train_mode = "min" if "loss" in FLAGS.eval_metric else "max"
+    epoch = cur_epoch+1
     string1, string2 = computeRemainingTime(epoch=epoch-1, num_epochs=FLAGS.num_epochs, train_start_time=train_start, epoch_start_time=epoch_start)
-    
+        
     # Read the latest evaluation results
     metrics_train_keys = [x for x in history.keys() if "train" in x and any([y in x for y in ["IoU", "ACC"]])]
-    metrics_val_keys = [x for x in history.keys() if "val" in x and any([y in x for y in ["IoU", "ACC"]])]
     metrics_train = {key: history[key][-1] for key in metrics_train_keys}
-    metrics_val = {key: history[key][-1] for key in metrics_val_keys}
 
     # Update the logfile 
-    train_mode = "min" if "loss" in FLAGS.eval_metric else "max"
     printAndLog(input_to_write=string1, logs=log_file, prefix="\n", postfix="\n")
     printAndLog(input_to_write="Train metrics:".ljust(25), logs=log_file, prefix="", postfix="")
-    printAndLog(input_to_write=metrics_train, logs=log_file, oneline=True, prefix="", postfix="\n", length=27)
+    printAndLog(input_to_write=metrics_train, logs=log_file, oneline=True, prefix="", postfix="\n", length=15)
+    metrics_val_keys = [x for x in history.keys() if "val" in x and any([y in x for y in ["IoU", "ACC"]])]
+    metrics_val = {key: history[key][-1] for key in metrics_val_keys}
     printAndLog(input_to_write="Validation metrics:".ljust(25), logs=log_file, prefix="")
-    printAndLog(input_to_write=metrics_val, logs=log_file, oneline=True, prefix="", postfix="\n", length=27)
+    printAndLog(input_to_write=metrics_val, logs=log_file, oneline=True, prefix="", postfix="\n", length=15)
     if train_mode=="min": new_best = np.min(history[FLAGS.eval_metric])
     if train_mode=="max": new_best = np.max(history[FLAGS.eval_metric])
     if np.abs(new_best-best_val) >= FLAGS.min_delta:
         printAndLog(input_to_write="{:s}: The model {:s} has improved from {:.3f} to {:.3f}".format("Epoch {:>3}".format(str(epoch)), FLAGS.eval_metric, best_val, new_best), logs=log_file, prefix="", postfix="\n")
         best_val = new_best
         best_epoch = epoch
-    if epoch < FLAGS.num_epochs:
+    if epoch < FLAGS.num_epochs and FLAGS.hp_optim == False:
         printAndLog(input_to_write=string2, logs=log_file, prefix="")
     return best_val, best_epoch
 

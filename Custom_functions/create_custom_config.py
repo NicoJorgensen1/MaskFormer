@@ -83,7 +83,7 @@ def changeConfig_withFLAGS(cfg, FLAGS):
     cfg.SOLVER.CHECKPOINT_PERIOD = FLAGS.epoch_iter                                         # Save a new model checkpoint after each epoch, i.e. after everytime the entire trainining set has been seen by the model
     cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST = 0.05                                            # Assign the IoU threshold used for the model
     cfg.INPUT.FORMAT = "BGR"                                                                # The input format is set to be BGR, like the visualization method
-    cfg.OUTPUT_DIR = os.path.join(MaskFormer_dir, "output_"+FLAGS.output_dir_postfix)       # Get MaskFormer directory and name the output directory
+    cfg.OUTPUT_DIR = os.path.join(MaskFormer_dir, "output_{:s}{:s}".format("vitrolife_" if "vitro" in FLAGS.dataset_name.lower() else "", FLAGS.output_dir_postfix))    # Get MaskFormer directory and name the output directory
     config_name = "config_initial.yaml"                                                     # Initial name for the configuration that will be saved in the cfg.OUTPUT_DIR
     if "vitrolife" in FLAGS.dataset_name.lower():                                           # If the vitrolife dataset was chosen ...
         cfg.MODEL.SEM_SEG_HEAD.NUM_CLASSES = len(MetadataCatalog[cfg.DATASETS.TEST[0]].stuff_classes)   # Assign the number of classes for the model to segment
@@ -106,6 +106,11 @@ def changeConfig_withFLAGS(cfg, FLAGS):
     with open(os.path.join(cfg.OUTPUT_DIR, config_name), "w") as f:                         # Open a object instance with the config file
         f.write(cfg.dump())                                                                 # Dump the configuration to a file named config_name in cfg.OUTPUT_DIR
     f.close()
+
+    # Change the config and add the FLAGS input arguments one by one ... Not pretty, but efficient and doesn't cost memory...
+    cfg.custom_key = []
+    for key in vars(FLAGS).keys():
+        cfg.custom_key.append(tuple((key, vars(FLAGS)[key])))
     
     # Return the custom configuration
     return cfg
