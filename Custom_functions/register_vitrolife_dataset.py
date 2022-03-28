@@ -28,7 +28,7 @@ def pickSamplesWithUniquePN(dataset_dict):
 def vitrolife_dataset_function(run_mode="train", debugging=False):
     # Find the folder containing the vitrolife dataset  
     vitrolife_dataset_filepath = os.path.join(os.getenv("DETECTRON2_DATASETS"), "Vitrolife_dataset")    # Get the path to the vitrolife dataset
-    
+    run_mode = "train"
     # Find the metadata file
     metadata_file = os.path.join(vitrolife_dataset_filepath, "metadata.csv")                # Get the csv file with the metadata for all images
     df_data = pd.read_csv(metadata_file)                                                    # Read the csv file 
@@ -68,7 +68,7 @@ def vitrolife_dataset_function(run_mode="train", debugging=False):
                         "image_custom_info": row}                                           # Add all the info from the current row to the dataset
         img_mask_pair_list.append(current_pair)                                             # Append the dictionary for the current pair to the list of images for the given dataset
         count += 1                                                                          # Increase the sample counter 
-        # if count > 10: break
+        if count > 10: break
     assert len(img_mask_pair_list) >= 1, print("No image/mask pairs found in {:s} subfolders 'raw_image' and 'masks'".format(vitrolife_dataset_filepath))
     img_mask_pair_list = natsorted(img_mask_pair_list)                                      # Sorting the list assures the same every time this function runs
     if debugging==True: img_mask_pair_list=pickSamplesWithUniquePN(img_mask_pair_list)      # If we are debugging, we'll only get one sample with each number of PN's 
