@@ -62,7 +62,7 @@ def changeConfig_withFLAGS(cfg, FLAGS):
     cfg.SOLVER.LR_SCHEDULER_NAME = "WarmupCosineLR"                                         # Default learning rate scheduler
     cfg.SOLVER.OPTIMIZER = FLAGS.optimizer_used.upper()                                     # The optimizer to use for training the model
     cfg.SOLVER.NESTEROV = True                                                              # Whether or not the learning algorithm will use Nesterow momentum
-    cfg.SOLVER.WEIGHT_DECAY = float(1e-4)                                                   # A small lambda value for the weight decay
+    cfg.SOLVER.WEIGHT_DECAY = 1e-3 if FLAGS.use_transformer_backbone else 1e-4              # A small lambda value for the weight decay. It is larger when training with transformers
     cfg.SOLVER.CLIP_GRADIENTS.ENABLED = False                                               # We won't clip the gradients at any point
     cfg.SOLVER.BACKBONE_MULTIPLIER = FLAGS.backbone_multiplier                              # Backbone learning rate = learning_rate * backbone_multiplier
     cfg.TEST.AUG = False                                                                    # No augmentation used for inference
