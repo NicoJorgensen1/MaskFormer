@@ -91,7 +91,7 @@ if FLAGS.hp_optim:
     warm_ups = FLAGS.warm_up_epochs
     FLAGS.warm_up_epochs = 0
     study = optuna.create_study(sampler=optuna.samplers.TPESampler(), study_name="Hyperparameter optimization for {:s} dataset".format(FLAGS.dataset_name), direction="maximize")
-    study.optimize(object_func, n_trials=15, callbacks=[lambda study, trial: garb_collect.collect()], catch=(MemoryError, RuntimeError, TypeError, ValueError, ZeroDivisionError), gc_after_trial=True)
+    study.optimize(object_func, n_trials=150, callbacks=[lambda study, trial: garb_collect.collect()], catch=(MemoryError, RuntimeError, TypeError, ValueError, ZeroDivisionError), gc_after_trial=True)
     trial = study.best_trial
     best_params = trial.params
     SaveHistory(historyObject=best_params, save_folder=cfg.OUTPUT_DIR, historyName="best_HPO_params")
