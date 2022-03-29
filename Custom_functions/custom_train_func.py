@@ -1,13 +1,12 @@
 # Import libraries 
-from random import choices
 import shutil                                                                                               # Used to copy/rename the metrics.json file after each training/validation step
 import os                                                                                                   # For joining paths
-import numpy as np 
+import numpy as np                                                                                          # For algebraic equations 
 from time import time                                                                                       # Used to time the epoch/training duration
-from copy import  deepcopy
-from detectron2.utils import comm
-from detectron2.utils.logger import setup_logger
-from custom_goto_trainer_class import My_GoTo_Trainer
+from copy import  deepcopy                                                                                  # Used to create a new copy in memory
+from detectron2.utils import comm                                                                           # Something with GPU processing
+from detectron2.utils.logger import setup_logger                                                            # Setup the logger that will perform logging of events
+from custom_goto_trainer_class import My_GoTo_Trainer                                                       # To instantiate the Trainer class
 from visualize_image_batch import putModelWeights                                                           # Assign the latest model checkpoint to the config model.weights 
 from custom_setup_func import SaveHistory, printAndLog                                                      # Save history_dict, log results
 from create_custom_config import createVitrolifeConfiguration, changeConfig_withFLAGS                       # Create the config used for hyperparameter optimization 
@@ -33,9 +32,9 @@ def run_train_func(cfg, run_mode):
 def launch_custom_training(FLAGS, config, dataset, epoch=0, run_mode="train", hyperparameter_opt=False):
     config.SOLVER.MAX_ITER = FLAGS.epoch_iter * (20 if all(["train" in run_mode, epoch>0, "vitrolife" in dataset]) else 1)  # Increase training iteration count for precise BN computations
     if all(["train" in run_mode, "vitrolife" in dataset, hyperparameter_opt==True]):                        # If we are optimizing hyperparameters on the vitrolife dataset...
-        config.SOLVER.MAX_ITER = int(FLAGS.epoch_iter * 5)                                                  # ... the epochs will contain only ~5000 samples, i.e. approximately five epochs...
+        config.SOLVER.MAX_ITER = int(FLAGS.epoch_iter * 4)                                                  # ... the epochs will contain only ~4000 samples, i.e. approximately five epochs...
     elif all(["train" in run_mode, "ade20k" in dataset, hyperparameter_opt==True]):                         # If we are optimizing hyperparameters on the ADE20K dataset...
-        config.SOLVER.MAX_ITER = int(FLAGS.epoch_iter * 1/4)                                                # ... the epochs will contain only ~5000 samples, i.e. 1/4 of the total samples...
+        config.SOLVER.MAX_ITER = int(FLAGS.epoch_iter * 1/5)                                                # ... the epochs will contain only ~4000 samples, i.e. 1/4 of the total samples...
     config.SOLVER.CHECKPOINT_PERIOD = config.SOLVER.MAX_ITER                                                # Save a new model checkpoint after each epoch
     if epoch==0 and "train" in run_mode: config.custom_key.append(tuple(("epoch_num", epoch)))              # Append the current epoch number to the custom_key list in the config ...
     if "train" in run_mode:                                                                                 # If we are training ... 
@@ -138,8 +137,8 @@ def objective_train_func(trial, FLAGS, cfg, logs, data_batches=None, hyperparame
             epoch_start_time = time()                                                                           # Now this new epoch starts
             if FLAGS.inference_only==False:
                 config = launch_custom_training(FLAGS=FLAGS, config=config, dataset=train_dataset, epoch=epoch, run_mode="train", hyperparameter_opt=hyperparameter_optimization)   # Launch the training loop for one epoch
-                eval_train_results, train_loader, train_evaluator, conf_matrix_train = evaluateResults(FLAGS, config, data_split="train", dataloader=train_loader, evaluator=train_evaluator)   # Evaluate the result on the training set
-                train_pq_results = pq_evaluation(args=FLAGS, config=config, data_split="train")                 # Evaluate the Panoptic Quality for the training semantic segmentation results  
+                eval_train_results, train_loader, train_evaluator, conf_matrix_train = evaluateResults(FLAGS, config, data_split="train", dataloader=train_loader, evaluator=train_evaluator, hp_optim=hyperparameter_optimization) # Evaluate the result on the training set
+                train_pq_results = pq_evaluation(args=FLAGS, config=config, data_split="train", hp_optim=hyperparameter_optimization)   # Evaluate the Panoptic Quality for the training semantic segmentation results  
             
             # Validation period. Will 'train' with lr=0 on validation data, correct the metrics files and evaluate performance on validation data
             config = launch_custom_training(FLAGS=FLAGS, config=config, dataset=val_dataset, epoch=epoch, run_mode="val", hyperparameter_opt=hyperparameter_optimization)   # Launch the training loop for one epoch
@@ -167,7 +166,7 @@ def objective_train_func(trial, FLAGS, cfg, logs, data_batches=None, hyperparame
                                     epoch_start=epoch_start_time, best_epoch=best_epoch, cur_epoch=epoch)
             if quit_training == True: break                                                                     # If the early stopping callback says we need to quit the training, break the for loop and stop running more epochs
         except Exception as ex:
-            error_string = "An exception of type {0} occured while performing epoch {:d}/{:d}. Arguments:\n{1!r}".format(type(ex).__name__, epoch+1, epochs_to_run, ex.args)
+            error_string = "An exception of type {} occured while performing epoch {}/{}. Arguments:\n{!r}".format(type(ex).__name__, epoch+1, epochs_to_run, ex.args)
             printAndLog(input_to_write=error_string, logs=logs)
 
     # Evaluation on the vitrolife test dataset. There is no ADE20K-test dataset.

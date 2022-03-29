@@ -44,7 +44,7 @@ fig_list_before, data_batches, cfg, FLAGS = visualize_the_images(config=cfg, FLA
 def object_func(trial):
     new_best = float("nan")
     it_count = 0
-    while np.isnan(new_best):                                                                       # Sometimes the iteration fails for some reason. We'll allow 3 attempts before skipping
+    while np.isnan(new_best):                                                                       # Sometimes the iteration fails for some reason. We'll allow 3 attempts before skipping and moving on
         try:
             new_best = objective_train_func(trial=trial, FLAGS=FLAGS, cfg=cfg, logs=log_file, data_batches=data_batches, hyperparameter_optimization=True)
         except Exception as ex:
@@ -107,7 +107,7 @@ if FLAGS.hp_optim:
         if np.isnan(hpo_trial.values[-1]): continue
         trials_list.append(hpo_trial)
         val_fwIoU_list.append(hpo_trial.values[-1])
-    vals_to_keep = np.unique(np.argsort(val_fwIoU_list)[:2].tolist() + np.argsort(val_fwIoU_list)[-2:].tolist())
+    vals_to_keep = np.unique(np.argsort(val_fwIoU_list)[:10].tolist() + np.argsort(val_fwIoU_list)[-10:].tolist())
     trials_to_keep = np.asarray(trials_list)[vals_to_keep]
     other_study = optuna.create_study()
     other_study.add_trials(trials_to_keep)

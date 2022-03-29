@@ -32,10 +32,11 @@ class My_Evaluator(SemSegEvaluator):
 
 
 # Define the evaluation function
-def evaluateResults(FLAGS, cfg, data_split="train",  dataloader=None, evaluator=None):
+def evaluateResults(FLAGS, cfg, data_split="train",  dataloader=None, evaluator=None, hp_optim=False):
     # Get the correct properties
     dataset_name = cfg.DATASETS.TRAIN[0] if "train" in data_split.lower() else cfg.DATASETS.TEST[0]         # Get the name of the dataset that will be evaluated
-    dataset_num_files = FLAGS.num_train_files if "train" in data_split.lower() else FLAGS.num_val_files     # Get the number of files 
+    total_runs = FLAGS.num_train_files if "train" in data_split.lower() else FLAGS.num_val_files            # Get the number of files 
+    if "train" in data_split and hp_optim==True: total_runs = 10                                            # If we are performing hyperparameter optimization, only 10 train samples will be evaluated
     pred_out_dir = os.path.join(cfg.OUTPUT_DIR, "Predictions", data_split)                                  # The path of where to store the resulting evaluation
     os.makedirs(pred_out_dir, exist_ok=True)                                                                # Create the evaluation folder, if it doesn't already exist
 
@@ -50,8 +51,8 @@ def evaluateResults(FLAGS, cfg, data_split="train",  dataloader=None, evaluator=
     evaluator.reset()                                                                                       # Reset the evaluator, i.e. remove all earlier computations and confusion matrixes
 
     # Create a progress bar to keep track on the evaluation
-    with tqdm(total=dataset_num_files, iterable=None, postfix="Evaluating the {:s} dataset".format(data_split), unit="img",  
-            file=sys.stdout, desc="Image {:d}/{:d}".format(1, dataset_num_files), colour="green", leave=True, ascii=True, 
+    with tqdm(total=total_runs, iterable=None, postfix="Evaluating the {:s} dataset".format(data_split), unit="img",  
+            file=sys.stdout, desc="Image {:d}/{:d}".format(1, total_runs), colour="green", leave=True, ascii=True, 
             bar_format="{desc}  | {percentage:3.0f}% | {bar:35}| {n_fmt}/{total_fmt} | [Spent: {elapsed}. Remaining: {remaining} | {postfix}]") as tepoch:     
         
         # Predict all the files in the dataset
@@ -63,9 +64,9 @@ def evaluateResults(FLAGS, cfg, data_split="train",  dataloader=None, evaluator=
                 out_pred = predictor.__call__(img)                                                          # Make a prediction for the input image
                 outputs.append(out_pred)                                                                    # Append the current output to the list of outputs
             evaluator.process(data_batch, outputs, gt_mask)                                                 # Process the results by adding the results to the confusion matrix
-            tepoch.desc = "Image {:d}/{:d} ".format(kk+1, dataset_num_files)                                # Update the description of the progress bar
+            tepoch.desc = "Image {:d}/{:d} ".format(kk+1, total_runs)                                       # Update the description of the progress bar
             tepoch.update(1)                                                                                # Update the progress bar
-            if kk+1 >= dataset_num_files: break                                                             # When all images in the dataset has been processed, break the for loop
+            if kk+1 >= total_runs: break                                                                    # When all images in the dataset has been processed, break the for loop
     
     # Evaluate the dataset results
     eval_metrics_results = evaluator.evaluate()                                                             # Compute the evaluation metrics, all IoU's and pixel accuracies

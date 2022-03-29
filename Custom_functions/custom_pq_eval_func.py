@@ -113,12 +113,12 @@ def pq_compute_single_image(segm_gt, segm_dt, categories, ignore_label):
     return pq_stat
 
 
-def pq_evaluation(args, config, data_split="train"):
+def pq_evaluation(args, config, data_split="train", hp_optim=False):
     if data_split == "train": args.dataset_name = config.DATASETS.TRAIN[0]
     else: args.dataset_name = config.DATASETS.TEST[0] 
     data_split = args.dataset_name.split("_")[-1]
     args.json_file = os.path.join(config.OUTPUT_DIR, "Predictions", data_split, "sem_seg_predictions.json")
-
+    total_runs = len(image_ids) if all(["train" not in data_split, hp_optim==False]) else 10                # If we are performing hyperparameter optimization, only 10 train samples will be evaluated
     _root = os.getenv("DETECTRON2_DATASETS")
     json_file = args.json_file
 
@@ -128,11 +128,10 @@ def pq_evaluation(args, config, data_split="train"):
     imgToAnns = defaultdict(list)
     for pred in predictions:
         image_id = os.path.basename(pred["file_name"]).split(".")[0]
-        imgToAnns[image_id].append(
-            {"category_id" : pred["category_id"], "segmentation" : pred["segmentation"]}
-        )
+        imgToAnns[image_id].append({"category_id" : pred["category_id"], "segmentation" : pred["segmentation"]})
 
     image_ids = list(imgToAnns.keys())
+    image_ids = image_ids[:total_runs]
 
     meta = MetadataCatalog.get(args.dataset_name)
     class_names = meta.stuff_classes
@@ -146,7 +145,7 @@ def pq_evaluation(args, config, data_split="train"):
 
     pq_stat = PQStat()
     iteration_counter = 1
-    for image_id in tqdm(image_ids, desc="Image {:d}/{:d}".format(iteration_counter, len(image_ids)), total=len(image_ids), postfix="Compute PQ for every {:s} image".format(data_split),
+    for image_id in tqdm(image_ids, desc="Image {:d}/{:d}".format(iteration_counter, total_runs), total=total_runs, postfix="Compute PQ for every {:s} image".format(data_split),
                 leave=True, bar_format="{desc}  | {percentage:3.0f}% | {bar:45}| {n_fmt}/{total_fmt} | [Spent: {elapsed}. Remaining: {remaining}{postfix}]"):
         if args.dataset_name == "ade20k_sem_seg_train":
             gt_dir = os.path.join(_root, "ADEChallengeData2016", "annotations_detectron2", "training")

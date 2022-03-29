@@ -160,6 +160,15 @@ class HungarianMatcher(nn.Module):
             For each batch element, it holds:
                 len(index_i) = len(index_j) = min(num_queries, num_target_boxes)
         """
+
+        # print("\n\n\n\n")
+        # print("The target is of type {}. Target element is of type {}. The keys are {}".format(type(targets), type(targets[0]), targets[0].keys()))
+        # print("The unique target label values are: {}".format(torch.unique(targets[0]["labels"]).cpu().numpy()))
+        # print("The unique target mask values are: {}\n".format(torch.unique(targets[0]["masks"]).cpu().numpy()))
+        # print("The output is of type: {}. The output keys are {}".format(type(outputs), outputs.keys()))
+        # print("The unique output pred_logits values are: {}".format(torch.unique(outputs["pred_logits"]).cpu().numpy()))
+        # print("The unique output pred_masks values are: {}".format(torch.unique(outputs["pred_masks"]).cpu().numpy()))
+
         return self.memory_efficient_forward(outputs, targets)
 
     def __repr__(self):
