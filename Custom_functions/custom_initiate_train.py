@@ -24,8 +24,7 @@ os.environ["DETECTRON2_DATASETS"] = dataset_dir
 
 # Import important libraries
 import optuna                                                                                       # Library used to perform hyperparameter optimization 
-import hiplot
-import numpy as np 
+import numpy as np                                                                                  # For algebraic equations and isnan boolean values
 import gc as garb_collect                                                                           # Used for garbage collecting after each hyperparameter trial
 from custom_callback_functions import keepAllButLatestAndBestModel                                  # Used for setting model weights on the config
 from custom_setup_func import setup_func, zip_output, printAndLog, getBestEpochResults, SaveHistory # Assign to GPU, register vitrolife dataset, create config, zip output_dir, log results, get best results, save dictionary
@@ -44,7 +43,7 @@ fig_list_before, data_batches, cfg, FLAGS = visualize_the_images(config=cfg, FLA
 def object_func(trial):
     new_best = float("nan")
     it_count = 0
-    while np.isnan(new_best):                                                                       # Sometimes the iteration fails for some reason. We'll allow three extra retrys before skipping
+    while np.isnan(new_best):                                                                       # Sometimes the iteration fails for some reason. We'll allow 3 attempts before skipping
         try:
             new_best = objective_train_func(trial=trial, FLAGS=FLAGS, cfg=cfg, logs=log_file, data_batches=data_batches, hyperparameter_optimization=True)
         except Exception as ex:
@@ -52,27 +51,79 @@ def object_func(trial):
             printAndLog(input_to_write=error_str, logs=log_file)
             new_best = float("nan")
         it_count += 1
-        if it_count >= 4: break 
+        if it_count >= 3:
+            printAndLog(input_to_write="", logs=log_file, print_str=False)
+            break 
     [os.remove(os.path.join(cfg.OUTPUT_DIR, x)) for x in os.listdir(cfg.OUTPUT_DIR) if all([x.endswith(".pth"), "model" in x.lower()])]
     [os.remove(os.path.join(cfg.OUTPUT_DIR, x)) for x in os.listdir(cfg.OUTPUT_DIR) if all([x.endswith(".json"), "metrics" in x.lower()])]
     [os.remove(os.path.join(cfg.OUTPUT_DIR, x)) for x in os.listdir(cfg.OUTPUT_DIR) if "events.out.tfevents" in x]
     FLAGS.HPO_trial += 1
     return new_best
 
+def tweak_figure_of_axes(axes):
+    if isinstance(axes, np.ndarray):
+        fig = axes[0,0].figure
+        fig.set_size_inches((np.multiply(axes.shape, 5.5)))
+        for row in range(axes.shape[0]):
+            for col in range(axes.shape[1]):
+                axes[row,col].xaxis.get_label().set_fontsize(20)
+                axes[row,col].yaxis.get_label().set_fontsize(20)
+                axes[row,col].title.set_fontsize(30)
+                for tick in axes[row,col].xaxis.get_ticklabels():
+                    tick.set_fontsize(15)
+                for tick in axes[row,col].yaxis.get_ticklabels():
+                    tick.set_fontsize(15)
+    if hasattr(axes, "plot"):
+        fig = axes.figure
+        fig.set_size_inches((18,12))
+        axes.xaxis.get_label().set_fontsize(15)
+        axes.yaxis.get_label().set_fontsize(15)
+        axes.title.set_fontsize(30)
+        for tick in axes.xaxis.get_ticklabels():
+            tick.set_fontsize(15)
+        for tick in axes.yaxis.get_ticklabels():
+            tick.set_fontsize(15)
+    return fig
+
 # Make a hyperparameter optimization
 if FLAGS.hp_optim:
     warm_ups = FLAGS.warm_up_epochs
     FLAGS.warm_up_epochs = 0
     study = optuna.create_study(sampler=optuna.samplers.TPESampler(), study_name="Hyperparameter optimization for {:s} dataset".format(FLAGS.dataset_name), direction="maximize")
-    study.optimize(object_func, n_trials=2, callbacks=[lambda study, trial: garb_collect.collect()])
+    study.optimize(object_func, n_trials=125, callbacks=[lambda study, trial: garb_collect.collect()], catch=(MemoryError, RuntimeError, TypeError, ValueError, ZeroDivisionError), gc_after_trial=True)
     trial = study.best_trial
+    trials_list, val_fwIoU_list = list(), list()
+    for hpo_trial in study.trials:
+        if hpo_trial.values is None: continue
+        if np.isnan(hpo_trial.values[-1]): continue
+        trials_list.append(hpo_trial.params)
+        val_fwIoU_list.append(hpo_trial.values[-1])
+    
     best_params = trial.params
     SaveHistory(historyObject=best_params, save_folder=cfg.OUTPUT_DIR, historyName="best_HPO_params")
     printAndLog(input_to_write="Hyperparameter optimization completed.\nBest val_fwIoU: {:.3f}".format(trial.value), logs=log_file, prefix="\n\n")
     printAndLog(input_to_write="Best hyperparameters: ".ljust(25), logs=log_file)
     printAndLog(input_to_write=best_params, logs=log_file, prefix="", postfix="\n\n", oneline=True, length=15)
     FLAGS.warm_up_epochs = warm_ups
-    fig = optuna.visualization.plot_contour(study)
+
+    # Plot the results
+    HPO_fig_folder = os.path.join(cfg.OUTPUT_DIR, "Visualizations", "HPO_figures")
+    os.makedirs(HPO_fig_folder, exist_ok=True) 
+    contour_axes = optuna.visualization.matplotlib.plot_contour(study, params=["learning_rate", "dropout", "weight_decay"] if "nico" in MaskFormer_dir.lower() else None, target_name="val_fwIoU")
+    fig_contour = tweak_figure_of_axes(axes=contour_axes)
+    fig_contour.savefig(os.path.join(HPO_fig_folder, "Contour_plot_of_params.jpg"))
+    hp_importance_axes = optuna.visualization.matplotlib.plot_param_importances(study, params=["learning_rate", "dropout", "weight_decay"] if "nico" in MaskFormer_dir.lower() else None)
+    fig_hp_importance = tweak_figure_of_axes(axes=hp_importance_axes)
+    fig_hp_importance.savefig(os.path.join(HPO_fig_folder, "Importance_of_hyperparameters.jpg"), bbox_inches="tight")
+    optim_axes = optuna.visualization.matplotlib.plot_optimization_history(study)
+    fig_optim = tweak_figure_of_axes(axes=optim_axes)
+    fig_optim.savefig(os.path.join(HPO_fig_folder, "Optimization_history.jpg"), bbox_inches="tight")
+    parallel_axes = optuna.visualization.matplotlib.plot_parallel_coordinate(study, params=["learning_rate", "dropout", "weight_decay"] if "nico" in MaskFormer_dir.lower() else None, target_name="val_fwIoU")
+    fig_parallel = tweak_figure_of_axes(axes=parallel_axes)
+    fig_parallel.savefig(os.path.join(HPO_fig_folder, "Parallel_axes.jpg"), bbox_inches="tight")
+    EDF_axes = optuna.visualization.matplotlib.plot_edf(study, target_name="val_fwIoU")
+    fig_EDF = tweak_figure_of_axes(axes=EDF_axes)
+    fig_EDF.savefig(os.path.join(HPO_fig_folder, "Empirical_Distribution_Plot.jpg"), bbox_inches="tight")
 
 # Train the model with the best found hyperparameters
 history, test_history, new_best, best_epoch, cfg = objective_train_func(trial=trial, FLAGS=FLAGS, cfg=cfg, logs=log_file, data_batches=data_batches, hyperparameter_optimization=False)

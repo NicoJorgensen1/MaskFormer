@@ -31,9 +31,9 @@ def run_train_func(cfg, run_mode):
 
 # Function to launch the training
 def launch_custom_training(FLAGS, config, dataset, epoch=0, run_mode="train", hyperparameter_opt=False):
-    # config.SOLVER.MAX_ITER = FLAGS.epoch_iter * (20 if all(["train" in run_mode, epoch>0, "vitrolife" in dataset]) else 1)  # Increase training iteration count for precise BN computations
-    # if all(["train" in run_mode, "vitrolife" in dataset, hyperparameter_opt==True]):                        # If we are optimizing hyperparameters ...
-    #     config.SOLVER.MAX_ITER = int(FLAGS.epoch_iter * 2)                                                  # ... the epochs won't be that long...
+    config.SOLVER.MAX_ITER = FLAGS.epoch_iter * (20 if all(["train" in run_mode, epoch>0, "vitrolife" in dataset]) else 1)  # Increase training iteration count for precise BN computations
+    if all(["train" in run_mode, "vitrolife" in dataset, hyperparameter_opt==True]):                        # If we are optimizing hyperparameters ...
+        config.SOLVER.MAX_ITER = int(FLAGS.epoch_iter * 5)                                                  # ... the epochs won't be that long...
     config.SOLVER.CHECKPOINT_PERIOD = config.SOLVER.MAX_ITER                                                # Save a new model checkpoint after each epoch
     if epoch==0 and "train" in run_mode: config.custom_key.append(tuple(("epoch_num", epoch)))              # Append the current epoch number to the custom_key list in the config ...
     if "train" in run_mode:                                                                                 # If we are training ... 
@@ -56,7 +56,7 @@ def launch_custom_training(FLAGS, config, dataset, epoch=0, run_mode="train", hy
 
 
 # Define a function to create the hyper parameters of the trials
-def get_HP_params(config, FLAGS, trial, hpt_opt=False):
+def get_HPO_params(config, FLAGS, trial, hpt_opt=False):
     # If we are performing hyperparameter optimization, the config should be updated
     if all([hpt_opt==True, trial is not None, FLAGS.hp_optim==True]):
         lr = trial.suggest_float(name="learning_rate", low=1e-7, high=1e-2)
@@ -107,7 +107,7 @@ def get_HP_params(config, FLAGS, trial, hpt_opt=False):
 
 
 # Create function to train the objective function
-def objective_train_func(trial, FLAGS=None, cfg=None, logs=None, data_batches=None, hyperparameter_optimization=False):
+def objective_train_func(trial, FLAGS, cfg, logs, data_batches=None, hyperparameter_optimization=False):
     # Setup training variables before starting training
     objective_mode = "training"
     if FLAGS.inference_only: objective_mode = "inference"
@@ -124,45 +124,49 @@ def objective_train_func(trial, FLAGS=None, cfg=None, logs=None, data_batches=No
     val_dataset = cfg.DATASETS.TEST                                                                         # Get the validation dataset name
     lr_update_check = np.zeros((FLAGS.patience, 1), dtype=bool)                                             # Preallocating array to determine whether or not the learning rate was updated
     quit_training = False                                                                                   # Boolean value determining whether or not to commit early stopping
-    epochs_to_run = 1 if hyperparameter_optimization else 2# FLAGS.num_epochs                                  # We'll run only two epochs if we
+    epochs_to_run = 1 if hyperparameter_optimization else FLAGS.num_epochs                                  # We'll run only two epochs if we
     train_start_time = time()                                                                               # Now the training starts
 
     # Change the FLAGS and config parameters and perform either hyperparameter optimization, use the best found parameters or simply just train
-    config, FLAGS = get_HP_params(config=cfg, FLAGS=FLAGS, trial=trial, hpt_opt=hyperparameter_optimization)
+    config, FLAGS = get_HPO_params(config=cfg, FLAGS=FLAGS, trial=trial, hpt_opt=hyperparameter_optimization)
     
     # Train the model 
     for epoch in range(epochs_to_run):                                                                      # Iterate over the chosen amount of epochs
-        epoch_start_time = time()                                                                           # Now this new epoch starts
-        if FLAGS.inference_only==False:
-            config = launch_custom_training(FLAGS=FLAGS, config=config, dataset=train_dataset, epoch=epoch, run_mode="train", hyperparameter_opt=hyperparameter_optimization)   # Launch the training loop for one epoch
-            eval_train_results, train_loader, train_evaluator, conf_matrix_train = evaluateResults(FLAGS, config, data_split="train", dataloader=train_loader, evaluator=train_evaluator)   # Evaluate the result on the training set
-            train_pq_results = pq_evaluation(args=FLAGS, config=config, data_split="train")             # Evaluate the Panoptic Quality for the training semantic segmentation results  
-        
-        # Validation period. Will 'train' with lr=0 on validation data, correct the metrics files and evaluate performance on validation data
-        config = launch_custom_training(FLAGS=FLAGS, config=config, dataset=val_dataset, epoch=epoch, run_mode="val", hyperparameter_opt=hyperparameter_optimization)   # Launch the training loop for one epoch
-        eval_val_results, val_loader, val_evaluator, conf_matrix_val = evaluateResults(FLAGS, config, data_split="val", dataloader=val_loader, evaluator=val_evaluator) # Evaluate the result metrics on the training set
-        val_pq_results = pq_evaluation(args=FLAGS, config=config, data_split="val")                         # Evaluate the Panoptic Quality for the validation semantic segmentation results
-        
-        # Prepare for the training phase of the next epoch. Switch back to training dataset, save history and learning curves and visualize segmentation results
-        history = show_history(config=config, FLAGS=FLAGS, metrics_train=eval_train_results["sem_seg"],     # Create and save the learning curves ...
-            metrics_eval=eval_val_results["sem_seg"], history=history, pq_train=train_pq_results, pq_val=val_pq_results)    # ... including all training and validation metrics
-        SaveHistory(historyObject=history, save_folder=config.OUTPUT_DIR)                                   # Save the history dictionary after each epoch
-        [os.remove(os.path.join(config.OUTPUT_DIR, x)) for x in os.listdir(config.OUTPUT_DIR) if "events.out.tfevent" in x]
-        if np.mod(np.add(epoch,1), FLAGS.display_rate) == 0 and hyperparameter_optimization==False:         # Every 'display_rate' epochs, the model will segment the same images again ...
-            _,data_batches,config,FLAGS = visualize_the_images(config=config, FLAGS=FLAGS, data_batches=data_batches, epoch_num=epoch+1)  # ... segment and save visualizations
-            _ = plot_confusion_matrix(config=config, epoch=epoch+1, conf_train=conf_matrix_train, conf_val=conf_matrix_val)
-        
-        # Performing callbacks
-        if FLAGS.inference_only==False and hyperparameter_optimization==False: 
-            config = keepAllButLatestAndBestModel(cfg=config, history=history, FLAGS=FLAGS)                 # Keep only the best and the latest model weights. The rest are deleted.
-            if epoch+1 >= FLAGS.patience:                                                                   # If the model has trained for more than 'patience' epochs and we aren't debugging ...
-                config, lr_update_check = lr_scheduler(cfg=config, history=history, FLAGS=FLAGS, lr_updated=lr_update_check)  # ... change the learning rate, if needed
-                FLAGS.learning_rate = config.SOLVER.BASE_LR                                                 # Update the FLAGS.learning_rate value
-            if epoch+1 >= FLAGS.early_stop_patience:                                                        # If the model has trained for more than 'early_stopping_patience' epochs ...
-                quit_training = early_stopping(history=history, FLAGS=FLAGS)                                # ... perform the early stopping callback
-        new_best, best_epoch = updateLogsFunc(log_file=logs, FLAGS=FLAGS, history=history, best_val=new_best, train_start=train_start_time,
-                                epoch_start=epoch_start_time, best_epoch=best_epoch, cur_epoch=epoch)
-        if quit_training == True: break                                                                     # If the early stopping callback says we need to quit the training, break the for loop and stop running more epochs
+        try:
+            epoch_start_time = time()                                                                           # Now this new epoch starts
+            if FLAGS.inference_only==False:
+                config = launch_custom_training(FLAGS=FLAGS, config=config, dataset=train_dataset, epoch=epoch, run_mode="train", hyperparameter_opt=hyperparameter_optimization)   # Launch the training loop for one epoch
+                eval_train_results, train_loader, train_evaluator, conf_matrix_train = evaluateResults(FLAGS, config, data_split="train", dataloader=train_loader, evaluator=train_evaluator)   # Evaluate the result on the training set
+                train_pq_results = pq_evaluation(args=FLAGS, config=config, data_split="train")                 # Evaluate the Panoptic Quality for the training semantic segmentation results  
+            
+            # Validation period. Will 'train' with lr=0 on validation data, correct the metrics files and evaluate performance on validation data
+            config = launch_custom_training(FLAGS=FLAGS, config=config, dataset=val_dataset, epoch=epoch, run_mode="val", hyperparameter_opt=hyperparameter_optimization)   # Launch the training loop for one epoch
+            eval_val_results, val_loader, val_evaluator, conf_matrix_val = evaluateResults(FLAGS, config, data_split="val", dataloader=val_loader, evaluator=val_evaluator) # Evaluate the result metrics on the training set
+            val_pq_results = pq_evaluation(args=FLAGS, config=config, data_split="val")                         # Evaluate the Panoptic Quality for the validation semantic segmentation results
+            
+            # Prepare for the training phase of the next epoch. Switch back to training dataset, save history and learning curves and visualize segmentation results
+            history = show_history(config=config, FLAGS=FLAGS, metrics_train=eval_train_results["sem_seg"],     # Create and save the learning curves ...
+                metrics_eval=eval_val_results["sem_seg"], history=history, pq_train=train_pq_results, pq_val=val_pq_results)    # ... including all training and validation metrics
+            SaveHistory(historyObject=history, save_folder=config.OUTPUT_DIR)                                   # Save the history dictionary after each epoch
+            [os.remove(os.path.join(config.OUTPUT_DIR, x)) for x in os.listdir(config.OUTPUT_DIR) if "events.out.tfevent" in x]
+            if np.mod(np.add(epoch,1), FLAGS.display_rate) == 0 and hyperparameter_optimization==False:         # Every 'display_rate' epochs, the model will segment the same images again ...
+                _,data_batches,config,FLAGS = visualize_the_images(config=config, FLAGS=FLAGS, data_batches=data_batches, epoch_num=epoch+1)  # ... segment and save visualizations
+                _ = plot_confusion_matrix(config=config, epoch=epoch+1, conf_train=conf_matrix_train, conf_val=conf_matrix_val)
+            
+            # Performing callbacks
+            if FLAGS.inference_only==False and hyperparameter_optimization==False: 
+                config = keepAllButLatestAndBestModel(cfg=config, history=history, FLAGS=FLAGS)                 # Keep only the best and the latest model weights. The rest are deleted.
+                if epoch+1 >= FLAGS.patience:                                                                   # If the model has trained for more than 'patience' epochs and we aren't debugging ...
+                    config, lr_update_check = lr_scheduler(cfg=config, history=history, FLAGS=FLAGS, lr_updated=lr_update_check)  # ... change the learning rate, if needed
+                    FLAGS.learning_rate = config.SOLVER.BASE_LR                                                 # Update the FLAGS.learning_rate value
+                if epoch+1 >= FLAGS.early_stop_patience:                                                        # If the model has trained for more than 'early_stopping_patience' epochs ...
+                    quit_training = early_stopping(history=history, FLAGS=FLAGS)                                # ... perform the early stopping callback
+            new_best, best_epoch = updateLogsFunc(log_file=logs, FLAGS=FLAGS, history=history, best_val=new_best, train_start=train_start_time,
+                                    epoch_start=epoch_start_time, best_epoch=best_epoch, cur_epoch=epoch)
+            if quit_training == True: break                                                                     # If the early stopping callback says we need to quit the training, break the for loop and stop running more epochs
+        except Exception as ex:
+            error_string = "An exception of type {0} occured while performing epoch {:d}/{:d}. Arguments:\n{1!r}".format(type(ex).__name__, epoch+1, epochs_to_run, ex.args)
+            printAndLog(input_to_write=error_string, logs=logs)
 
     # Evaluation on the vitrolife test dataset. There is no ADE20K-test dataset.
     if all([FLAGS.debugging == False, "vitrolife" in FLAGS.dataset_name.lower(), hyperparameter_optimization==False]):  # Inference will only be performed when training the Vitrolife model
