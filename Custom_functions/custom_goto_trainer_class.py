@@ -166,21 +166,21 @@ class My_GoTo_Trainer(DefaultTrainer):
         cfg.defrost()
         cfg.DATALOADER.NUM_WORKERS = 0  # save some memory and time for PreciseBN
 
+        cfg.TEST.PRECISE_BN.ENABLED = True
         dataset_used = cfg.DATASETS.TRAIN[0]                                        # Get the current dataset
         if "val" in dataset_used: cfg.TEST.PRECISE_BN.ENABLED = False               # If we are in validation, precise_bn is disabled
         num_files = MetadataCatalog[dataset_used].num_files_in_dataset              # Read the number of files of the used dataset
-        max_iter = cfg.SOLVER.MAX_ITER                                              # Read the number of iterations in the current epoch
-        precise_bn_period = int(np.ceil(np.divide(max_iter, num_files)))            # Precise BN should be enabled after each epoch 
+        precise_bn_period = int(num_files/2) if num_files < 305 else 150            # Every 150 iteration the PreciseBN will be calculated
 
 
         ret = [
             hooks.IterationTimer(),
             hooks.LRScheduler(),
             hooks.PreciseBN(
-                precise_bn_period,                                                  # Run precise_BN after each epoch
+                precise_bn_period,                                                  # Run precise_BN after precise_bn_period iterations
                 self.model,                                                         # Assign the current model that must be used for the precise BN
                 self.build_train_loader(cfg),                                       # Build a new data loader to not affect training
-                precise_bn_period)                                                  # The number of iterations used to compute the precise values
+                precise_bn_period)                                                  # The number of iterations used for computing the precise values
             if cfg.TEST.PRECISE_BN.ENABLED and get_bn_modules(self.model) else None]
 
         # Do PreciseBN before checkpointer, because it updates the model and need to be saved by checkpointer.

@@ -118,7 +118,6 @@ def pq_evaluation(args, config, data_split="train", hp_optim=False):
     else: args.dataset_name = config.DATASETS.TEST[0] 
     data_split = args.dataset_name.split("_")[-1]
     args.json_file = os.path.join(config.OUTPUT_DIR, "Predictions", data_split, "sem_seg_predictions.json")
-    total_runs = len(image_ids) if all(["train" not in data_split, hp_optim==False]) else 10                # If we are performing hyperparameter optimization, only 10 train samples will be evaluated
     _root = os.getenv("DETECTRON2_DATASETS")
     json_file = args.json_file
 
@@ -131,6 +130,7 @@ def pq_evaluation(args, config, data_split="train", hp_optim=False):
         imgToAnns[image_id].append({"category_id" : pred["category_id"], "segmentation" : pred["segmentation"]})
 
     image_ids = list(imgToAnns.keys())
+    total_runs = len(image_ids) if all(["train" not in data_split, hp_optim==False]) else 10                    # If we are performing hyperparameter optimization, only 10 train samples will be evaluated
     image_ids = image_ids[:total_runs]
 
     meta = MetadataCatalog.get(args.dataset_name)

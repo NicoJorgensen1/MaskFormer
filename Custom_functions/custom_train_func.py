@@ -30,11 +30,11 @@ def run_train_func(cfg, run_mode):
 
 # Function to launch the training
 def launch_custom_training(FLAGS, config, dataset, epoch=0, run_mode="train", hyperparameter_opt=False):
-    config.SOLVER.MAX_ITER = FLAGS.epoch_iter * (20 if all(["train" in run_mode, epoch>0, "vitrolife" in dataset]) else 1)  # Increase training iteration count for precise BN computations
+    config.SOLVER.MAX_ITER = FLAGS.epoch_iter * (12 if all(["train" in run_mode, epoch>0, "vitrolife" in dataset]) else 1)  # Increase training iteration count for precise BN computations
     if all(["train" in run_mode, "vitrolife" in dataset, hyperparameter_opt==True]):                        # If we are optimizing hyperparameters on the vitrolife dataset...
-        config.SOLVER.MAX_ITER = int(FLAGS.epoch_iter * 4)                                                  # ... the epochs will contain only ~4000 samples, i.e. approximately five epochs...
+        config.SOLVER.MAX_ITER = int(FLAGS.epoch_iter * 1)                                                  # ... the samples will only be seen once every epoch
     elif all(["train" in run_mode, "ade20k" in dataset, hyperparameter_opt==True]):                         # If we are optimizing hyperparameters on the ADE20K dataset...
-        config.SOLVER.MAX_ITER = int(FLAGS.epoch_iter * 1/5)                                                # ... the epochs will contain only ~4000 samples, i.e. 1/4 of the total samples...
+        config.SOLVER.MAX_ITER = int(FLAGS.epoch_iter * 1/20)                                               # ... the epochs will contain only ~1000 samples, i.e. 1/20 of the total samples...
     config.SOLVER.CHECKPOINT_PERIOD = config.SOLVER.MAX_ITER                                                # Save a new model checkpoint after each epoch
     if epoch==0 and "train" in run_mode: config.custom_key.append(tuple(("epoch_num", epoch)))              # Append the current epoch number to the custom_key list in the config ...
     if "train" in run_mode:                                                                                 # If we are training ... 
@@ -125,7 +125,7 @@ def objective_train_func(trial, FLAGS, cfg, logs, data_batches=None, hyperparame
     val_dataset = cfg.DATASETS.TEST                                                                         # Get the validation dataset name
     lr_update_check = np.zeros((FLAGS.patience, 1), dtype=bool)                                             # Preallocating array to determine whether or not the learning rate was updated
     quit_training = False                                                                                   # Boolean value determining whether or not to commit early stopping
-    epochs_to_run = 1 if hyperparameter_optimization else FLAGS.num_epochs                                  # We'll run only two epochs if we
+    epochs_to_run = 1 if hyperparameter_optimization else FLAGS.num_epochs                                  # We'll run only 1 epoch if we are performing HPO
     train_start_time = time()                                                                               # Now the training starts
 
     # Change the FLAGS and config parameters and perform either hyperparameter optimization, use the best found parameters or simply just train
