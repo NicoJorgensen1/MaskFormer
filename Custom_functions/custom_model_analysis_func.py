@@ -2,6 +2,7 @@
 # Copyright (c) Facebook, Inc. and its affiliates.
 # Modified by Bowen Cheng from https://github.com/facebookresearch/detectron2/blob/main/tools/analyze_model.py
 
+from ast import arg, parse
 import logging
 import numpy as np
 from collections import Counter
@@ -101,39 +102,17 @@ def do_structure(cfg):
 
 
 # if __name__ == "__main__":
-def analyze_model_func(config):
-    parser = default_argument_parser()
-    parser.add_argument(
-        "--tasks",
-        choices=["flop", "activation", "parameter", "structure"],
-        default=["flop", "activation", "parameter"],
-        required=False,
-        nargs="+",
-    )
-    parser.add_argument(
-        "-n",
-        "--num-inputs",
-        default=1,
-        type=int,
-        help="number of inputs used to compute statistics for flops/activations, "
-        "both are data dependent.",
-    )
-    parser.add_argument(
-        "--use-fixed-input-size",
-        action="store_true",
-        help="use fixed input size when calculating flops",
-    )
-    args = parser.parse_args()
+def analyze_model_func(config, args):
+    args.tasks = ["flop", "activation", "parameter"]
+    args.num_inputs = 1
+    args.use_fixed_input_size = True
     assert not args.eval_only
     assert args.num_gpus == 1
-
     config = setup(args, config)
-    
-    # for task in args.tasks:
     res = { "Parameters": "".join([x.strip() for x in do_parameter(config).split("|")[8]]),
             "Total GFlops": do_flop(config, args),
             "Activations": do_activation(config, args)}
-    return res
+    return res, args
 
 # from copy import deepcopy
 # res = analyze_model_func(config=deepcopy(cfg))
