@@ -49,7 +49,7 @@ def object_func(trial):
             new_best = objective_train_func(trial=trial, FLAGS=FLAGS, cfg=cfg, logs=log_file, data_batches=data_batches, hyperparameter_optimization=True)
         except Exception as ex:
             error_str = "An exception of type {0} occured. Arguments:\n{1!r}".format(type(ex).__name__, ex.args)
-            printAndLog(input_to_write=error_str, logs=log_file)
+            printAndLog(input_to_write=error_str, logs=log_file, postfix="\n")
             new_best = float("nan")
         it_count += 1
         if it_count >= 3:
@@ -91,7 +91,7 @@ if FLAGS.hp_optim:
     warm_ups = FLAGS.warm_up_epochs
     FLAGS.warm_up_epochs = 0
     study = optuna.create_study(sampler=optuna.samplers.TPESampler(), study_name="Hyperparameter optimization for {:s} dataset".format(FLAGS.dataset_name), direction="maximize")
-    study.optimize(object_func, n_trials=150, callbacks=[lambda study, trial: garb_collect.collect()], catch=(MemoryError, RuntimeError, TypeError, ValueError, ZeroDivisionError), gc_after_trial=True)
+    study.optimize(object_func, n_trials=250, callbacks=[lambda study, trial: garb_collect.collect()], catch=(MemoryError, RuntimeError, TypeError, ValueError, ZeroDivisionError), gc_after_trial=True)
     trial = study.best_trial
     best_params = trial.params
     SaveHistory(historyObject=best_params, save_folder=cfg.OUTPUT_DIR, historyName="best_HPO_params")

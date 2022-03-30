@@ -63,7 +63,7 @@ def changeConfig_withFLAGS(cfg, FLAGS):
     cfg.SOLVER.OPTIMIZER = FLAGS.optimizer_used.upper()                                     # The optimizer to use for training the model
     cfg.SOLVER.NESTEROV = True                                                              # Whether or not the learning algorithm will use Nesterow momentum
     cfg.SOLVER.WEIGHT_DECAY = FLAGS.weight_decay                                            # A small lambda value for the weight decay. It is larger when training with transformers
-    cfg.SOLVER.CLIP_GRADIENTS.ENABLED = True                                                # We need to clip the gradients during training in order to avoid nan values when performing backpropagation ...
+    cfg.SOLVER.CLIP_GRADIENTS.ENABLED = True                                                # We need to clip the gradients during training in order to avoid exploding gradients, especially when performing HPO
     cfg.SOLVER.BACKBONE_MULTIPLIER = FLAGS.backbone_multiplier                              # Backbone learning rate = learning_rate * backbone_multiplier
     cfg.TEST.AUG = False                                                                    # No augmentation used for inference
     cfg.MODEL.PANOPTIC_FPN.COMBINE.ENABLED = False                                          # Disable the panoptic head during inference
