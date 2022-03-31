@@ -57,7 +57,7 @@ def secondsToDaysHrsMinSec(seconds):
     days = np.floor(seconds/(3600*24))                                              # Compute the number of days the amount of seconds span
     hrs = np.floor((seconds-days*3600*24)/3600)                                     # Compute the remaining amount of hours the amount of seconds span
     mins = np.floor((seconds-days*3600*24-hrs*3600)/60)                             # Compute the remaining amount of minutes the amount of seconds span
-    secs = np.mod(seconds, 60)                                                      # Compute the remaining amount of seconds the amount of seconds span
+    secs = np.floor(np.mod(seconds, 60))                                            # Compute the remaining amount of seconds the amount of seconds span
     days_string = "{:.0f}days:".format(days) if days > 0 else ""                    # Initiate a string with how many days are in the amount of seconds
     hrs_string = "{:.0f}hr:".format(hrs) if (days > 0 or hrs > 0) else ""           # Initiate a string with how many hours are in the amount of seconds
     mins_string = "{:.0f}min:".format(mins) if (days > 0 or hrs > 0 or mins > 0) else ""    # Initiate a string with how many minuts are in the amount of seconds
@@ -91,7 +91,8 @@ def updateLogsFunc(log_file, FLAGS, history, best_val, train_start, epoch_start,
     metrics_train = {key: history[key][-1] for key in metrics_train_keys}
 
     # Update the logfile 
-    printAndLog(input_to_write=string1, logs=log_file, prefix="\n", postfix="\n")
+    if any([FLAGS.HPO_current_trial >= FLAGS.num_trials-1, FLAGS.hp_optim==False]):
+        printAndLog(input_to_write=string1, logs=log_file, prefix="\n", postfix="\n")
     printAndLog(input_to_write="Train metrics:".ljust(25), logs=log_file, prefix="", postfix="")
     printAndLog(input_to_write=metrics_train, logs=log_file, oneline=True, prefix="", postfix="\n", length=15)
     metrics_val_keys = [x for x in history.keys() if "val" in x and any([y in x for y in ["IoU", "ACC"]])]
@@ -101,10 +102,12 @@ def updateLogsFunc(log_file, FLAGS, history, best_val, train_start, epoch_start,
     if train_mode=="min": new_best = np.min(history[FLAGS.eval_metric])
     if train_mode=="max": new_best = np.max(history[FLAGS.eval_metric])
     if np.abs(new_best-best_val) >= FLAGS.min_delta:
-        printAndLog(input_to_write="{:s}: The model {:s} has improved from {:.3f} to {:.3f}".format("Epoch {:>3}".format(str(epoch)), FLAGS.eval_metric, best_val, new_best), logs=log_file, prefix="", postfix="\n")
+        printAndLog(input_to_write="{:s}: The model {:s} has improved from {:.3f} to {:.3f}".format("{:s} {:>3}".
+                    format("Epoch" if any([FLAGS.HPO_current_trial >= FLAGS.num_trials-1, FLAGS.hp_optim==False]) else "Trial",
+                    str(epoch)), FLAGS.eval_metric, best_val, new_best), logs=log_file, prefix="", postfix="\n")
         best_val = new_best
         best_epoch = epoch
-    if epoch < FLAGS.num_epochs and FLAGS.hp_optim == False:
+    if epoch < FLAGS.num_epochs and any([FLAGS.HPO_current_trial >= FLAGS.num_trials-1, FLAGS.hp_optim==False]):
         printAndLog(input_to_write=string2, logs=log_file, prefix="")
     return best_val, best_epoch
 

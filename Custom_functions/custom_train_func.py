@@ -31,10 +31,9 @@ def run_train_func(cfg, run_mode):
 # Function to launch the training
 def launch_custom_training(FLAGS, config, dataset, epoch=0, run_mode="train", hyperparameter_opt=False):
     config.SOLVER.MAX_ITER = FLAGS.epoch_iter * (15 if all(["train" in run_mode, epoch>0, "vitrolife" in dataset]) else 2)  # Increase training iteration count for precise BN computations
-    if all(["train" in run_mode, "vitrolife" in dataset, hyperparameter_opt==True]):                        # If we are optimizing hyperparameters on the vitrolife dataset...
-        config.SOLVER.MAX_ITER = int(FLAGS.epoch_iter * (1 if FLAGS.use_per_pixel_baseline else 3))         # ... Transformer and ResNet backbones need a little more data to do well while searching...
-    elif all(["train" in run_mode, "ade20k" in dataset, hyperparameter_opt==True]):                         # If we are optimizing hyperparameters on the ADE20K dataset...
-        config.SOLVER.MAX_ITER = int(FLAGS.epoch_iter * (1 if FLAGS.use_per_pixel_baseline else 3)/20)      # ... the epochs will contain only ~1000 samples, i.e. 1/20 of the total samples...
+    if all(["train" in run_mode, hyperparameter_opt==True]):
+        if "vitrolife" in dataset: config.SOLVER.MAX_ITER = int(FLAGS.epoch_iter * (1.5 if FLAGS.use_per_pixel_baseline else 3))    # ... Transformer and ResNet backbones need a little more data to do well while searching...
+        elif "ade20k" in dataset: config.SOLVER.MAX_ITER = int(FLAGS.epoch_iter * (1 if FLAGS.use_per_pixel_baseline else 2)/20)    # ... the epochs will contain only ~1000 samples, i.e. 1/20 of the total samples...
     config.SOLVER.CHECKPOINT_PERIOD = config.SOLVER.MAX_ITER                                                # Save a new model checkpoint after each epoch
     if epoch==0 and "train" in run_mode: config.custom_key.append(tuple(("epoch_num", epoch)))              # Append the current epoch number to the custom_key list in the config ...
     if "train" in run_mode:                                                                                 # If we are training ... 
@@ -52,7 +51,7 @@ def launch_custom_training(FLAGS, config, dataset, epoch=0, run_mode="train", hy
     os.remove(os.path.join(config.OUTPUT_DIR, "metrics.json"))                                              # Remove the original metrics file
     shutil.copyfile(os.path.join(config.OUTPUT_DIR, "model_final.pth"),                                     # Rename the metrics.json to "run_mode"_metricsX.json ...
         os.path.join(config.OUTPUT_DIR, "model_epoch_{:d}.pth".format(epoch+1)))                            # ... where X is the current epoch number    
-    [os.remove(os.path.join(config.OUTPUT_DIR, x)) for x in os.listdir(config.OUTPUT_DIR) if "model_" in x and "epoch" not in x and x.endswith(".pth")]  # Remove all irrelevant models
+    [os.remove(os.path.join(config.OUTPUT_DIR, x)) for x in os.listdir(config.OUTPUT_DIR) if all(["model_" in x, "epoch" not in x, x.endswith(".pth")])]    # Remove all irrelevant models
     return config
 
 
@@ -60,12 +59,12 @@ def launch_custom_training(FLAGS, config, dataset, epoch=0, run_mode="train", hy
 def get_HPO_params(config, FLAGS, trial, hpt_opt=False):
     # If we are performing hyperparameter optimization, the config should be updated
     if all([hpt_opt==True, trial is not None, FLAGS.hp_optim==True]):
-        lr = trial.suggest_float(name="learning_rate", low=1e-7, high=1e-2)
-        batch_size = trial.suggest_int(name="batch_size", low=1, high=1 if "nico" in os.getenv("DETECTRON2_DATASETS").lower() else 20)
+        lr = trial.suggest_float(name="learning_rate", low=1e-7, high=5e-3)
+        batch_size = trial.suggest_int(name="batch_size", low=1, high=1 if "nico" in os.getenv("DETECTRON2_DATASETS").lower() else int(np.ceil(np.min(FLAGS.available_mem_info)/1000)))
         optimizer_used = trial.suggest_categorical(name="optimizer_used", choices=["ADAMW", "SGD"])
         weight_decay = trial.suggest_float(name="weight_decay", low=1e-7, high=1e-2)
-        dice_loss_weight = trial.suggest_int(name="dice_loss_weight", low=2, high=25)
-        mask_loss_weight = trial.suggest_int(name="mask_loss_weight", low=2, high=25)
+        dice_loss_weight = trial.suggest_int(name="dice_loss_weight", low=2, high=20)
+        mask_loss_weight = trial.suggest_int(name="mask_loss_weight", low=2, high=20)
         dropout = trial.suggest_float(name="dropout", low=1e-6, high=0.5)
         num_queries = trial.suggest_int(name="num_queries", low=10, high=125)
         use_checkpoint = trial.suggest_categorical(name="use_checkpoint", choices=["True", "False"])
@@ -112,8 +111,8 @@ def objective_train_func(trial, FLAGS, cfg, logs, data_batches=None, hyperparame
     # Setup training variables before starting training
     objective_mode = "training"
     if FLAGS.inference_only: objective_mode = "inference"
-    if hyperparameter_optimization: objective_mode = "hyperparameter optimization trial #{:d}".format(FLAGS.HPO_trial)
-    printAndLog(input_to_write="Start {:s}...".format(objective_mode).upper(), logs=logs)                   # Print and log a message saying that a new iteration is now starting
+    if hyperparameter_optimization: objective_mode = "hyperparameter optimization trial {:d}/{:d}".format(FLAGS.HPO_current_trial, FLAGS.num_trials)
+    printAndLog(input_to_write="Start {:s}...".format(objective_mode).upper(), logs=logs, postfix="\n")     # Print and log a message saying that a new iteration is now starting
     train_loader, val_loader, train_evaluator, val_evaluator, history = None, None, None, None, None        # Initiates all the loaders, evaluators and history as None type objects
     train_mode = "min" if "loss" in FLAGS.eval_metric else "max"                                            # Compute the mode of which the performance should be measured. Either a negative or a positive value is better
     new_best = np.inf if train_mode=="min" else -np.inf                                                     # Initiate the original "best_value" as either infinity or -infinity according to train_mode
@@ -167,7 +166,7 @@ def objective_train_func(trial, FLAGS, cfg, logs, data_batches=None, hyperparame
             if quit_training == True: break                                                                     # If the early stopping callback says we need to quit the training, break the for loop and stop running more epochs
         except Exception as ex:
             error_string = "An exception of type {} occured while performing epoch {}/{}. Arguments:\n{!r}".format(type(ex).__name__, epoch+1, epochs_to_run, ex.args)
-            printAndLog(input_to_write=error_string, logs=logs)
+            printAndLog(input_to_write=error_string, logs=logs, prefix="", postfix="\n")
 
     # Evaluation on the vitrolife test dataset. There is no ADE20K-test dataset.
     if all([FLAGS.debugging == False, "vitrolife" in FLAGS.dataset_name.lower(), hyperparameter_optimization==False]):  # Inference will only be performed when training the Vitrolife model

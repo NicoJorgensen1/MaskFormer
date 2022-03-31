@@ -67,6 +67,7 @@ class My_GoTo_Trainer(DefaultTrainer):
             if "epoch_num" in item[0]: current_epoch = item[1]                                                  # If the current item is the tuple with the epoch_number and the current epoch number is noted
             if "learning_rate" in item[0]: wanted_lr = item[1]                                                  # Get the initial learning rate
             if "warm_up_epochs" in item[0]: warm_ups = item[1]                                                  # Get the wanted number of warm up epochs
+            # if ""
         if warm_ups >= current_epoch:                                                                           # If we are still in the warm up phase ...
             learn_rates = np.linspace(start=np.divide(wanted_lr, 100), stop=wanted_lr, num=warm_ups+1)          # ... we'll create an array of the possible learning rates to choose from
             learn_rates = np.multiply(learn_rates, np.divide(1, wanted_lr))                                     # For some reason necessary ... 
