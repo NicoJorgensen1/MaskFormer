@@ -5,7 +5,10 @@ import numpy as np                                                              
 import gc as garb_collect                                                                           # Used for garbage collecting after each hyperparameter trial
 from time import time                                                                               # Used for timing the trials 
 from copy import deepcopy                                                                           # Used for creating a new copy of a variable to memory
-from custom_setup_func import printAndLog
+from sys import path as sys_PATH                                                                    # Import the PATH variable
+from custom_setup_func import printAndLog, setup_func, SaveHistory
+from custom_train_func import objective_train_func
+from custom_callback_functions import computeRemainingTime
 
 
 # Function to tweak figures created by the Optuna visualization method
@@ -35,15 +38,15 @@ def tweak_figure_of_axes(axes):
     return fig
 
 
+
 # The objective function that will be run by the Optuna HPO study
 def object_func(trial):
-    log_file = transfer_log_file()
     HPO_trial_start = time()
     new_best = float("nan")
     it_count = 0
-    while np.isnan(new_best):                                                                       # Sometimes the iteration fails for some reason. We'll allow 3 attempts before skipping and moving on
+    while np.isnan(new_best):                                                                           # Sometimes the iteration fails for some reason. We'll allow 3 attempts before skipping and moving on
         try:
-            new_best = objective_train_func(trial=trial, FLAGS=FLAGS, cfg=cfg, logs=log_file, data_batches=data_batches, hyperparameter_optimization=True)
+            new_best = objective_train_func(trial=trial, FLAGS=FLAGS, cfg=cfg, logs=log_file, data_batches=["this is an empty list"], hyperparameter_optimization=True)
         except Exception as ex:
             error_str = "An exception of type {0} occured. Arguments:\n{1!r}".format(type(ex).__name__, ex.args)
             printAndLog(input_to_write=error_str, logs=log_file, postfix="\n")
@@ -64,58 +67,62 @@ def object_func(trial):
     FLAGS.HPO_current_trial += 1
     return new_best
 
-def perform_HPO(FLAGS, cfg, log_file):
-    def transfer_log_file(): return log_file
-    # Make a hyperparameter optimization
-    warm_ups = deepcopy(FLAGS.warm_up_epochs)                                                       # Make a deepcopy of the number of warmups
-    FLAGS.warm_up_epochs = 0                                                                        # Set the number of warmup epochs to 0 when performing HPO
-    TPE_sampler = optuna.samplers.TPESampler(n_startup_trials=FLAGS.num_random_trials)              # Initiate the search with some random samples to explore the search space, before starting to optimize
-    study_name = "Hyperparameter optimization for {:s} dataset".format(FLAGS.dataset_name)          # Unique identifier for the study saved in memory
-    storage_file = "sqlite:///{}.db".format(os.path.join(cfg.OUTPUT_DIR,study_name))                # Create a database file in local memory to store the study 
-    HPO_start = time()                                                                              # Set the time for the start of the HPO 
-    study = optuna.create_study(sampler=TPE_sampler, study_name=study_name, direction="maximize", storage=storage_file, load_if_exists=True)    # Needs all these arguments to reload a study ...
-    study.optimize(object_func, n_trials=FLAGS.num_trials, callbacks=[lambda study, trial: garb_collect.collect()],
-                    catch=(MemoryError, RuntimeError, TypeError, ValueError, ZeroDivisionError), gc_after_trial=True)
-    trial = study.best_trial
-    best_params = trial.params
-    SaveHistory(historyObject=best_params, save_folder=cfg.OUTPUT_DIR, historyName="best_HPO_params")
-    printAndLog(input_to_write="Hyperparameter optimization completed.\nBest {:s}: {:.3f}".format(FLAGS.eval_metric, trial.value), logs=log_file, prefix="\n")
-    printAndLog(input_to_write="Best hyperparameters: ".ljust(25), logs=log_file)
-    printAndLog(input_to_write={key: best_params[key] for key in sorted(best_params.keys(), reverse=True)}, logs=log_file, prefix="", postfix="\n", length=15)
-    FLAGS.warm_up_epochs = warm_ups
 
-    # Create a new study object only containing the 10 best and worst trials - just used for plotting
-    trials_list, eval_metric_list = list(), list()
-    for hpo_trial in study.trials:
-        if hpo_trial.values is None: continue
-        if np.isnan(hpo_trial.values[-1]): continue
-        trials_list.append(hpo_trial)
-        eval_metric_list.append(hpo_trial.values[-1])
-    vals_to_keep = np.unique(np.argsort(eval_metric_list)[:10].tolist() + np.argsort(eval_metric_list)[-10:].tolist())
-    trials_to_keep = np.asarray(trials_list)[vals_to_keep]
-    other_study = optuna.create_study(direction="maximize")
-    other_study.add_trials(trials_to_keep)
+FLAGS, cfg, log_file = setup_func()                                                                     # Get the FLAGS, config and log_file 
+HPO_start = time()                                                                                      # Set the time for the start of the HPO 
+MaskFormer_dir = [x for x in sys_PATH if x.endswith("MaskFormer")][0]
+def perform_HPO():
+    if FLAGS.hp_optim:
+        # Make a hyperparameter optimization
+        warm_ups = deepcopy(FLAGS.warm_up_epochs)                                                       # Make a deepcopy of the number of warmups
+        FLAGS.warm_up_epochs = 0                                                                        # Set the number of warmup epochs to 0 when performing HPO
+        TPE_sampler = optuna.samplers.TPESampler(n_startup_trials=FLAGS.num_random_trials)              # Initiate the search with some random samples to explore the search space, before starting to optimize
+        study_name = "Hyperparameter optimization for {:s} dataset".format(FLAGS.dataset_name)          # Unique identifier for the study saved in memory
+        storage_file = "sqlite:///{}.db".format(os.path.join(cfg.OUTPUT_DIR,study_name))                # Create a database file in local memory to store the study 
+        
+        study = optuna.create_study(sampler=TPE_sampler, study_name=study_name, direction="maximize", storage=storage_file, load_if_exists=True)    # Needs all these arguments to reload a study ...
+        study.optimize(object_func, n_trials=FLAGS.num_trials, callbacks=[lambda study, trial: garb_collect.collect()],
+                        catch=(MemoryError, RuntimeError, TypeError, ValueError, ZeroDivisionError), gc_after_trial=True)
+        trial = study.best_trial
+        best_params = trial.params
+        SaveHistory(historyObject=best_params, save_folder=cfg.OUTPUT_DIR, historyName="best_HPO_params")
+        printAndLog(input_to_write="Hyperparameter optimization completed.\nBest {:s}: {:.3f}".format(FLAGS.eval_metric, trial.value), logs=log_file, prefix="\n")
+        printAndLog(input_to_write="Best hyperparameters: ".ljust(25), logs=log_file)
+        printAndLog(input_to_write={key: best_params[key] for key in sorted(best_params.keys(), reverse=True)}, logs=log_file, prefix="", postfix="\n", length=15)
+        FLAGS.warm_up_epochs = warm_ups
 
-    # Plot the results
-    HPO_fig_folder = os.path.join(cfg.OUTPUT_DIR, "Visualizations", "HPO_figures")
-    os.makedirs(HPO_fig_folder, exist_ok=True) 
-    contour_axes = optuna.visualization.matplotlib.plot_contour(study, params=["learning_rate", "dropout", "weight_decay"] if "nico" in MaskFormer_dir.lower() else None, target_name=FLAGS.eval_metric)
-    fig_contour = tweak_figure_of_axes(axes=contour_axes)
-    fig_contour.savefig(os.path.join(HPO_fig_folder, "Contour_plot_of_params.jpg"))
-    hp_importance_axes = optuna.visualization.matplotlib.plot_param_importances(study, params=["learning_rate", "dropout", "weight_decay"] if "nico" in MaskFormer_dir.lower() else None)
-    fig_hp_importance = tweak_figure_of_axes(axes=hp_importance_axes)
-    fig_hp_importance.savefig(os.path.join(HPO_fig_folder, "Importance_of_hyperparameters.jpg"), bbox_inches="tight")
-    optim_axes = optuna.visualization.matplotlib.plot_optimization_history(study)
-    fig_optim = tweak_figure_of_axes(axes=optim_axes)
-    fig_optim.savefig(os.path.join(HPO_fig_folder, "Optimization_history.jpg"), bbox_inches="tight")
-    parallel_axes = optuna.visualization.matplotlib.plot_parallel_coordinate(study, params=["learning_rate", "dropout", "weight_decay"] if "nico" in MaskFormer_dir.lower() else None, target_name=FLAGS.eval_metric)
-    fig_parallel = tweak_figure_of_axes(axes=parallel_axes)
-    fig_parallel.savefig(os.path.join(HPO_fig_folder, "Parallel_axes.jpg"), bbox_inches="tight")
-    parallel_axes2 = optuna.visualization.matplotlib.plot_parallel_coordinate(other_study, params=["learning_rate", "dropout", "weight_decay"] if "nico" in MaskFormer_dir.lower() else None, target_name=FLAGS.eval_metric)
-    fig_parallel2 = tweak_figure_of_axes(axes=parallel_axes2)
-    fig_parallel2.savefig(os.path.join(HPO_fig_folder, "Parallel_axes_10_best_10_worst.jpg"), bbox_inches="tight")
-    EDF_axes = optuna.visualization.matplotlib.plot_edf(study, target_name=FLAGS.eval_metric)
-    fig_EDF = tweak_figure_of_axes(axes=EDF_axes)
-    fig_EDF.savefig(os.path.join(HPO_fig_folder, "Empirical_Distribution_Plot.jpg"), bbox_inches="tight")
+        # Create a new study object only containing the 10 best and worst trials - just used for plotting
+        trials_list, eval_metric_list = list(), list()
+        for hpo_trial in study.trials:
+            if hpo_trial.values is None: continue
+            if np.isnan(hpo_trial.values[-1]): continue
+            trials_list.append(hpo_trial)
+            eval_metric_list.append(hpo_trial.values[-1])
+        vals_to_keep = np.unique(np.argsort(eval_metric_list)[:10].tolist() + np.argsort(eval_metric_list)[-10:].tolist())
+        trials_to_keep = np.asarray(trials_list)[vals_to_keep]
+        other_study = optuna.create_study(direction="maximize")
+        other_study.add_trials(trials_to_keep)
+
+        # Plot the results
+        HPO_fig_folder = os.path.join(cfg.OUTPUT_DIR, "Visualizations", "HPO_figures")
+        os.makedirs(HPO_fig_folder, exist_ok=True) 
+        contour_axes = optuna.visualization.matplotlib.plot_contour(study, params=["learning_rate", "dropout", "weight_decay"] if "nico" in MaskFormer_dir.lower() else None, target_name=FLAGS.eval_metric)
+        fig_contour = tweak_figure_of_axes(axes=contour_axes)
+        fig_contour.savefig(os.path.join(HPO_fig_folder, "Contour_plot_of_params.jpg"))
+        hp_importance_axes = optuna.visualization.matplotlib.plot_param_importances(study, params=["learning_rate", "dropout", "weight_decay"] if "nico" in MaskFormer_dir.lower() else None)
+        fig_hp_importance = tweak_figure_of_axes(axes=hp_importance_axes)
+        fig_hp_importance.savefig(os.path.join(HPO_fig_folder, "Importance_of_hyperparameters.jpg"), bbox_inches="tight")
+        optim_axes = optuna.visualization.matplotlib.plot_optimization_history(study)
+        fig_optim = tweak_figure_of_axes(axes=optim_axes)
+        fig_optim.savefig(os.path.join(HPO_fig_folder, "Optimization_history.jpg"), bbox_inches="tight")
+        parallel_axes = optuna.visualization.matplotlib.plot_parallel_coordinate(study, params=["learning_rate", "dropout", "weight_decay"] if "nico" in MaskFormer_dir.lower() else None, target_name=FLAGS.eval_metric)
+        fig_parallel = tweak_figure_of_axes(axes=parallel_axes)
+        fig_parallel.savefig(os.path.join(HPO_fig_folder, "Parallel_axes.jpg"), bbox_inches="tight")
+        parallel_axes2 = optuna.visualization.matplotlib.plot_parallel_coordinate(other_study, params=["learning_rate", "dropout", "weight_decay"] if "nico" in MaskFormer_dir.lower() else None, target_name=FLAGS.eval_metric)
+        fig_parallel2 = tweak_figure_of_axes(axes=parallel_axes2)
+        fig_parallel2.savefig(os.path.join(HPO_fig_folder, "Parallel_axes_10_best_10_worst.jpg"), bbox_inches="tight")
+        EDF_axes = optuna.visualization.matplotlib.plot_edf(study, target_name=FLAGS.eval_metric)
+        fig_EDF = tweak_figure_of_axes(axes=EDF_axes)
+        fig_EDF.savefig(os.path.join(HPO_fig_folder, "Empirical_Distribution_Plot.jpg"), bbox_inches="tight")
 
     return FLAGS, cfg, trial
