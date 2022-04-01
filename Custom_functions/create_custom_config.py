@@ -101,17 +101,17 @@ def changeConfig_withFLAGS(cfg, FLAGS):
         cfg.SOLVER.WEIGHT_DECAY = float(0)                                                  # ... we don't want any weight decay
         cfg.MODEL.MASK_FORMER.DROPOUT = float(0)                                            # ... we don't wany any dropout
 
+    # Change the config and add the FLAGS input arguments one by one ... Not pretty, but efficient and doesn't cost memory...
+    cfg.custom_key = []
+    for key in vars(FLAGS).keys():
+        cfg.custom_key.append(tuple((key, vars(FLAGS)[key])))
+
     # Write the new config as a .yaml file - it already does, in the output dir...
     os.makedirs(cfg.OUTPUT_DIR, exist_ok=True)                                              # Create the output folder, if it doesn't already exist
     with open(os.path.join(cfg.OUTPUT_DIR, config_name), "w") as f:                         # Open a object instance with the config file
         f.write(cfg.dump())                                                                 # Dump the configuration to a file named config_name in cfg.OUTPUT_DIR
     f.close()
 
-    # Change the config and add the FLAGS input arguments one by one ... Not pretty, but efficient and doesn't cost memory...
-    cfg.custom_key = []
-    for key in vars(FLAGS).keys():
-        cfg.custom_key.append(tuple((key, vars(FLAGS)[key])))
-    
     # Return the custom configuration
     return cfg
 

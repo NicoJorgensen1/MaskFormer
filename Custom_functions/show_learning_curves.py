@@ -73,9 +73,9 @@ def extractRelevantHistoryKeys(history):
     RQ_per_class = [key for key in history.keys() if "_RQ_" in key and not key.endswith("RQ")]          # Extract all keys with the per_class RQ
     SQ_per_class = [key for key in history.keys() if "_SQ_" in key and not key.endswith("SQ")]          # Extract all keys with the per_class SQ
     learn_rate = [key for key in history.keys() if "lr" in key.lower() and "val" not in key.lower()]    # Find the training learning rate
-    hist_keys = [loss_total, m_fw_IoU, pq_rq_sq, mACC_pACC, loss_ce, loss_dice, loss_mask,              # Combine the key-lists into a list of ...
+    hist_keys_list = [loss_total, m_fw_IoU, pq_rq_sq, mACC_pACC, loss_ce, loss_dice, loss_mask,         # Combine the key-lists into a list of ...
                 learn_rate, pACC_per_class, PQ_per_class, RQ_per_class, SQ_per_class, IoU_per_class]    # lists containing all relevant keys
-    return hist_keys
+    return hist_keys_list
 
 
 # Create a function to create the history dictionary
@@ -103,7 +103,8 @@ def combineDataToHistoryDictionaryFunc(config, eval_metrics=None, pq_metrics=Non
                     for key in pq_metrics[master_key][class_key]:                                       # Loop through all the class_variables of PQ, SQ, RQ
                         if data_split+"_{:s}_C{:d}".format(key.upper(), class_key) not in history: history[data_split+"_{:s}_C{:d}".format(key.upper(), class_key)] = list()
                         history[data_split+"_{:s}_C{:d}".format(key.upper(), class_key)].append(pq_metrics[master_key][class_key][key]*100)
-    return history
+    new_history = {key: history[key] for key in history.keys() if all(np.isnan(history[key]))==False and "_C{:d}".format(MetadataCatalog[config.DATASETS.TRAIN[0]].ignore_label) not in key}
+    return new_history
 
 
 # Function to display learning curves

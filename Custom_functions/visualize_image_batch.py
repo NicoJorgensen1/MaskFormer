@@ -72,8 +72,8 @@ def putModelWeights(config, delete_remaining=False):
 
 
 # Define a function to predict some label-masks for the dataset
-def create_batch_img_ytrue_ypred(config, data_split, FLAGS, data_batch=None):
-    config = putModelWeights(config)                                                # Change the config and append the latest model as the used checkpoint
+def create_batch_img_ytrue_ypred(config, data_split, FLAGS, data_batch=None, model_done_training=False):
+    if model_done_training==False: config = putModelWeights(config)                 # Change the config and append the latest model as the used checkpoint, if the model is still training
     predictor = DefaultPredictor(cfg=config)                                        # Create a default predictor instance
     Softmax_module = nn.Softmax(dim=2)                                              # Create a module to compute the softmax value along the final, channel, dimension of the predicted images
     if data_batch == None:                                                          # If no batch with data was send to the function ...
@@ -81,7 +81,6 @@ def create_batch_img_ytrue_ypred(config, data_split, FLAGS, data_batch=None):
             dataset_dicts = vitrolife_dataset_function(data_split, debugging=True)  # ... the list of dataset_dicts from vitrolife is computed.
             dataset_dicts = dataset_dicts[:FLAGS.num_images]                        # We'll maximally show the first FLAGS.num_images images
         else: dataset_dicts = DatasetCatalog.get("ade20k_sem_seg_{:s}".format(data_split))  # Else we use the ADE20K dataset
-        config = putModelWeights(config)                                            # Add the newest model weights to the configuration
         if "train" in data_split: data_mapper = custom_augmentation_mapper(config=config, is_train=True)    # Use the custom data augmentation mapper for training images
         else: data_mapper = DatasetMapper(config, is_train=False, augmentations=[]) # Use the regular, default mapper for val+test images without any augmentation
         dataloader = build_detection_train_loader(dataset_dicts, mapper=data_mapper, total_batch_size=np.min([FLAGS.num_images, len(dataset_dicts)]))   # Create the dataloader
@@ -102,7 +101,7 @@ def create_batch_img_ytrue_ypred(config, data_split, FLAGS, data_batch=None):
         img_ytrue_ypred["y_pred"].append(y_pred_col)                                # Append the predicted mask to the dictionary
         if "vitrolife" in FLAGS.dataset_name.lower():                               # If we are visualizing the vitrolife dataset
             img_ytrue_ypred["PN"].append(int(data["image_custom_info"]["PN_image"]))# Read the true number of PN on the current image
-    return img_ytrue_ypred, data_batch, FLAGS
+    return img_ytrue_ypred, data_batch, FLAGS, config
 
 
 # Function to create directories in which the visualization results are saved
@@ -135,8 +134,8 @@ def visualize_the_images(config, FLAGS, position=[0.55, 0.08, 0.40, 0.75], epoch
         data_split_count += 1
         if "vitrolife" not in FLAGS.dataset_name.lower() and data_split=="test": continue   # Only vitrolife has a test dataset. ADE20K doesn't. 
         # Extract information about the dataset used
-        img_ytrue_ypred, data_batch, FLAGS = create_batch_img_ytrue_ypred(config=config,    # Create the batch of images that needs to be visualized ...
-                data_split=data_split, FLAGS=FLAGS, data_batch=data_batch)                  # ... and return the images in the data_batch dictionary
+        img_ytrue_ypred, data_batch, FLAGS, config = create_batch_img_ytrue_ypred(config=config,    # Create the batch of images that needs to be visualized ...
+            data_split=data_split, FLAGS=FLAGS, data_batch=data_batch, model_done_training=model_done_training) # ... and return the images in the data_batch dictionary
         if "vitrolife" in FLAGS.dataset_name.lower():                               # If we are working on the vitrolife dataset sort the ...
             data_batch = sorted(data_batch, key=lambda x: x["image_custom_info"]["PN_image"])   # ... data_batch after the number of PN per found image
             img_ytrue_ypred = sort_dictionary_by_PN(data=img_ytrue_ypred)           # And then also sort the data dictionary
@@ -163,6 +162,6 @@ def visualize_the_images(config, FLAGS, position=[0.55, 0.08, 0.40, 0.75], epoch
         fig_list.append(fig)                                                        # Append the current figure to the list of figures
         data_batches_final.append(data_batch)                                       # Append the current data_batch to the list of data_batches
         fig.show() if FLAGS.display_images==True else plt.close(fig)                # Display the figure if that is the chosen option
-    return fig_list, data_batches_final, putModelWeights(config), FLAGS             # Return the figure, the dictionary with the used images and the updated config with a new model checkpoint
+    return fig_list, data_batches_final, config, FLAGS                              # Return the figure, the dictionary with the used images, the config and the FLAGS arguments
 
 

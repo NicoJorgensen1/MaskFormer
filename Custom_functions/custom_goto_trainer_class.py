@@ -67,15 +67,21 @@ class My_GoTo_Trainer(DefaultTrainer):
             if "epoch_num" in item[0]: current_epoch = item[1]                                                  # If the current item is the tuple with the epoch_number and the current epoch number is noted
             if "learning_rate" in item[0]: wanted_lr = item[1]                                                  # Get the initial learning rate
             if "warm_up_epochs" in item[0]: warm_ups = item[1]                                                  # Get the wanted number of warm up epochs
-            # if ""
-        if warm_ups >= current_epoch:                                                                           # If we are still in the warm up phase ...
+            if "num_trials" in item[0]: num_trials = item[1]                                                    # Get the total number of HPO trials to run
+            if "HPO_current_trial" in item[0]: HPO_current_trial = item[1]                                      # Get the current HPO trial 
+            if "hp_optim" in item[0]: do_HPO_bool = item[1]                                                     # Get the variable as whether or not we are doing HPO
+        # if do_HPO_bool==True: current_epoch -= num_trials                                                       # As every trial counts as an epoch, the "correct" number of epochs needs to get trial_num subtracted
+        if all([HPO_current_trial < num_trials, do_HPO_bool==True]):                                            # If we are still in the HPO trials ...
+            start_val, end_val = 1, 1                                                                           # ... then the learning rate will be constant
+        elif warm_ups >= current_epoch:                                                                         # If we are still in the warm up phase ...
             learn_rates = np.linspace(start=np.divide(wanted_lr, 100), stop=wanted_lr, num=warm_ups+1)          # ... we'll create an array of the possible learning rates to choose from
             learn_rates = np.multiply(learn_rates, np.divide(1, wanted_lr))                                     # For some reason necessary ... 
             start_val = learn_rates[current_epoch-1]                                                            # ... and then choose the starting learning rate as the lower one
             end_val = learn_rates[current_epoch]                                                                # ... and then choose the next learning rate as the higher one
         elif warm_ups < current_epoch:                                                                          # Instead if we are in the regular training period ...
-            start_val, end_val = float(1), float(1*0.5)                                                         # Then the learning rate will be cyclical between '--learning_rate' and '0.5 * --learning_rate'
+            start_val, end_val = float(1), float(0.5)                                                           # Then the learning rate will be cyclical between '--learning_rate' and '0.5 * --learning_rate'
         if "train" not in cfg.DATASETS.TRAIN[0]: start_val, end_val = 0, 0                                      # If we are using the validation or test set, then learning rates are set to 0
+        
         sched = CosineParamScheduler2(start_value=start_val, end_value=end_val)
         scheduler = LRMultiplier(optimizer, multiplier=sched, max_iter=cfg.SOLVER.MAX_ITER)
         return scheduler

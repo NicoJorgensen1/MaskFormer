@@ -36,19 +36,31 @@ def lr_scheduler(cfg, history, FLAGS, lr_updated):
 
 
 # Define a function to delete all models but the 
-def keepAllButLatestAndBestModel(cfg, history, FLAGS, bestOrLatest="latest", delete_leftovers=True):
+def keepAllButLatestAndBestModel(cfg, history, FLAGS, bestOrLatest="latest", delete_leftovers=True, logs=None):
     model_files = natsorted([x for x in os.listdir(cfg.OUTPUT_DIR) if "model_epoch" in x.lower()])  # Get a list of available models
     if len(model_files) >= 1:                                                       # If any model files have been saved yet ...
         mode = "min" if "loss" in FLAGS.eval_metric.lower() else "max"              # Whether a lower value or a higher value is better
-        epoch_numbers = [extractNumbersFromString(x, dtype=int) for x in model_files]   # Extract which epoch each model are from
+        epoch_numbers = [extractNumbersFromString(x, dtype=int) for x in model_files]   # Extract which epoch each model is from
         metric_list = history[FLAGS.eval_metric]                                    # Read the list of values for the metric chosen to use as 
-        metric_list = np.asarray(metric_list)[np.subtract(epoch_numbers,1)].tolist()# Get the remaining values (i.e. if some models have already been deleted, their corresponding values should be removed)
+        metric_list = np.asarray(metric_list)[np.subtract(epoch_numbers,1)]         # Get the remaining values (i.e. if some models have already been deleted, their corresponding values should be removed)
         best_model_idx = np.argmin(metric_list) if mode=="min" else np.argmax(metric_list)  # Get the idx of the best epoch
+        best_epoch = np.asarray(epoch_numbers)[best_model_idx]
         best_model = model_files[best_model_idx]                                    # Get the model name of the best model
         latest_model = model_files[np.argmax(epoch_numbers)]                        # Get the model name of the latest model
+        models_to_delete = []
         if delete_leftovers == True:                                                # If we want to delete the leftovers ...
-            [os.remove(os.path.join(cfg.OUTPUT_DIR, x)) for x in model_files if not any([x==best_model, x==latest_model])]  # ... remove the models that are neither the best or latest model
+            for model in model_files:
+                if best_model in model or latest_model in model: continue
+                os.remove(os.path.join(cfg.OUTPUT_DIR, model))
+                models_to_delete.append(model)
         cfg.MODEL.WEIGHTS = os.path.join(cfg.OUTPUT_DIR, latest_model if "latest" in bestOrLatest.lower() else best_model)  # Set the model weights as either the best or the latest model
+        model_to_keep = latest_model if "latest" in bestOrLatest.lower() else best_model
+        if logs is not None:
+            printAndLog(input_to_write="The model files: {}. The metrics_list {}".format(model_files, metric_list), logs=logs, prefix="\n\n")
+            printAndLog(input_to_write="The best model idx is: {}, thus epoch {}, named {}. The latest model is {}".format(best_model_idx, best_epoch, best_model, latest_model), logs=logs)
+            printAndLog(input_to_write="latest_model if 'latest' in bestOrLatest.lower() else best_model => {}. Thus model_to_keep = {}".format(latest_model if "latest" in bestOrLatest.lower() else best_model, model_to_keep), logs=logs)
+            printAndLog(input_to_write="The model_weights in the config: {}".format(cfg.MODEL.WEIGHTS), logs=logs)
+            printAndLog(input_to_write="The models to delete: {}".format(models_to_delete), logs=logs, postfix="\n\n")
     return cfg                                                                      # Return the config where the cfg.MODEL.WEIGHTS are set to the chosen model
 
 
@@ -80,6 +92,7 @@ def computeRemainingTime(epoch=0, num_epochs=None, train_start_time=time(), epoc
     string2 = "Now the last {:.0f} epoch{:s} are expected to take {:s}\n".format(epochs_left, "s" if epochs_left>1 else "", secondsToDaysHrsMinSec(timeLeft))
     return string1, string2
 
+
 # Write to the log file if the model has improved
 def updateLogsFunc(log_file, FLAGS, history, best_val, train_start, epoch_start, best_epoch, cur_epoch):
     train_mode = "min" if "loss" in FLAGS.eval_metric else "max"
@@ -91,8 +104,8 @@ def updateLogsFunc(log_file, FLAGS, history, best_val, train_start, epoch_start,
     metrics_train = {key: history[key][-1] for key in metrics_train_keys}
 
     # Update the logfile 
-    if any([FLAGS.HPO_current_trial >= FLAGS.num_trials-1, FLAGS.hp_optim==False]):
-        printAndLog(input_to_write=string1, logs=log_file, prefix="\n", postfix="\n")
+    if any([FLAGS.HPO_current_trial >= FLAGS.num_trials, FLAGS.hp_optim==False]):
+        printAndLog(input_to_write=string1, logs=log_file, postfix="\n")
     printAndLog(input_to_write="Train metrics:".ljust(25), logs=log_file, prefix="", postfix="")
     printAndLog(input_to_write=metrics_train, logs=log_file, oneline=True, prefix="", postfix="\n", length=15)
     metrics_val_keys = [x for x in history.keys() if "val" in x and any([y in x for y in ["IoU", "ACC"]])]
@@ -102,12 +115,12 @@ def updateLogsFunc(log_file, FLAGS, history, best_val, train_start, epoch_start,
     if train_mode=="min": new_best = np.min(history[FLAGS.eval_metric])
     if train_mode=="max": new_best = np.max(history[FLAGS.eval_metric])
     if np.abs(new_best-best_val) >= FLAGS.min_delta:
-        printAndLog(input_to_write="{:s}: The model {:s} has improved from {:.3f} to {:.3f}".format("{:s} {:>3}".
-                    format("Epoch" if any([FLAGS.HPO_current_trial >= FLAGS.num_trials-1, FLAGS.hp_optim==False]) else "Trial",
+        printAndLog(input_to_write="{:s}: The {:s} has improved from {:.3f} to {:.3f}".format("{:s} {:>3}".
+                    format("Epoch" if any([FLAGS.HPO_current_trial >= FLAGS.num_trials, FLAGS.hp_optim==False]) else "Trial",
                     str(epoch)), FLAGS.eval_metric, best_val, new_best), logs=log_file, prefix="", postfix="\n")
         best_val = new_best
         best_epoch = epoch
-    if epoch < FLAGS.num_epochs and any([FLAGS.HPO_current_trial >= FLAGS.num_trials-1, FLAGS.hp_optim==False]):
+    if epoch < FLAGS.num_epochs and any([FLAGS.HPO_current_trial >= FLAGS.num_trials, FLAGS.hp_optim==False]):
         printAndLog(input_to_write=string2, logs=log_file, prefix="")
     return best_val, best_epoch
 

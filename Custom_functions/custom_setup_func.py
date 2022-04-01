@@ -77,6 +77,7 @@ def changeFLAGS(FLAGS):
     if FLAGS.inference_only: FLAGS.num_epochs = 1                           # If we are only using inference, then we'll only run through one epoch
     FLAGS.num_queries = 100 if "ade20k" in FLAGS.dataset_name.lower() else 25   # The number of queries will be set to 100 with the ADE20K dataset and 25 with the Vitrolife dataset
     FLAGS.HPO_current_trial = 0                                             # A counter for the number of trials of hyperparameter optimization performed 
+    FLAGS.epoch_num = 0                                                     # A counter iterating over the number of epochs 
     return FLAGS
 
 # Define a function to extract the final results that will be printed in the log file
@@ -110,14 +111,14 @@ parser.add_argument("--img_size_max", type=int, default=500, help="The length of
 parser.add_argument("--resnet_depth", type=int, default=50, help="The depth of the feature extracting ResNet backbone. Possible values: [18,34,50,101] Default: 50")
 parser.add_argument("--batch_size", type=int, default=1, help="The batch size used for training the model. Default: 1")
 parser.add_argument("--num_images", type=int, default=6, help="The number of images to display/segment. Default: 6")
-parser.add_argument("--num_trials", type=int, default=4, help="The number of trials to run HPO for. Only relevant if '--hp_optim==True'. Default: 300")
-parser.add_argument("--num_random_trials", type=int, default=2, help="The number of random trials to run initiate the HPO for. Only relevant if '--hp_optim==True'. Default: 30")
-parser.add_argument("--display_rate", type=int, default=1, help="The epoch_rate of how often to display image segmentations. A display_rate of 3 means that every third epoch, visual segmentations are saved. Default: 25")
+parser.add_argument("--num_trials", type=int, default=300, help="The number of trials to run HPO for. Only relevant if '--hp_optim==True'. Default: 300")
+parser.add_argument("--num_random_trials", type=int, default=30, help="The number of random trials to run initiate the HPO for. Only relevant if '--hp_optim==True'. Default: 30")
+parser.add_argument("--display_rate", type=int, default=5, help="The epoch_rate of how often to display image segmentations. A display_rate of 3 means that every third epoch, visual segmentations are saved. Default: 5")
 parser.add_argument("--gpus_used", type=int, default=1, help="The number of GPU's to use for training. Only applicable for training with ADE20K. This input argument deprecates the '--num-gpus' argument. Default: 1")
-parser.add_argument("--num_epochs", type=int, default=3, help="The number of epochs to train the model for. Default: 1")
-parser.add_argument("--warm_up_epochs", type=int, default=2, help="The number of epochs to warm up the learning rate when training. Will go from 1/100 '--learning_rate' to '--learning_rate' during these warm_up_epochs. Default: 1")
-parser.add_argument("--patience", type=int, default=3, help="The number of epochs to accept that the model hasn't improved before lowering the learning rate by a factor '--lr_gamma'. Default: 6")
-parser.add_argument("--early_stop_patience", type=int, default=9, help="The number of epochs to accept that the model hasn't improved before terminating training. Default: 15")
+parser.add_argument("--num_epochs", type=int, default=50, help="The number of epochs to train the model for. Default: 1")
+parser.add_argument("--warm_up_epochs", type=int, default=3, help="The number of epochs to warm up the learning rate when training. Will go from 1/100 '--learning_rate' to '--learning_rate' during these warm_up_epochs. Default: 2")
+parser.add_argument("--patience", type=int, default=3, help="The number of epochs to accept that the model hasn't improved before lowering the learning rate by a factor '--lr_gamma'. Default: 3")
+parser.add_argument("--early_stop_patience", type=int, default=8, help="The number of epochs to accept that the model hasn't improved before terminating training. Default: 8")
 parser.add_argument("--dice_loss_weight", type=int, default=10, help="The weighting for the dice loss in the loss function. Default: 10")
 parser.add_argument("--mask_loss_weight", type=int, default=20, help="The weighting for the mask loss in the loss function. Default: 20")
 parser.add_argument("--learning_rate", type=float, default=1e-3, help="The initial learning rate used for training the model. Default: 1e-3")
@@ -131,8 +132,8 @@ parser.add_argument("--hp_optim", type=str2bool, default=True, help="Whether or 
 parser.add_argument("--inference_only", type=str2bool, default=False, help="Whether or not training is skipped and only inference is run. This input argument deprecates the '--eval_only' argument. Default: False")
 parser.add_argument("--display_images", type=str2bool, default=False, help="Whether or not some random sample images are displayed before training starts. Default: False")
 parser.add_argument("--use_checkpoint", type=str2bool, default=False, help="Whether or not we are loading weights from a model checkpoint file before training. Default: False")
-parser.add_argument("--use_transformer_backbone", type=str2bool, default=False, help="Whether or now we are using the extended swin_small_transformer backbone. Only applicable if '--use_per_pixel_baseline'=False. Default: False")
-parser.add_argument("--use_per_pixel_baseline", type=str2bool, default=True, help="Whether or now we are using the per_pixel_calculating head. Alternative is the MaskFormer (or transformer) heads. Default: True")
+parser.add_argument("--use_transformer_backbone", type=str2bool, default=True, help="Whether or now we are using the extended swin_small_transformer backbone. Only applicable if '--use_per_pixel_baseline'=False. Default: True")
+parser.add_argument("--use_per_pixel_baseline", type=str2bool, default=False, help="Whether or now we are using the per_pixel_calculating head. Alternative is the MaskFormer (or transformer) heads. Default: False")
 parser.add_argument("--debugging", type=str2bool, default=False, help="Whether or not we are debugging the script. Default: False")
 # Parse the arguments into a Namespace variable
 FLAGS = parser.parse_args()
@@ -154,7 +155,7 @@ FLAGS.num_val_files = MetadataCatalog[cfg.DATASETS.TEST[0]].num_files_in_dataset
 if FLAGS.batch_size > FLAGS.num_train_files: FLAGS.batch_size = FLAGS.num_train_files   # The batch size can't be greater than the number of files in the dataset
 FLAGS.epoch_iter = int(np.floor(np.divide(FLAGS.num_train_files, FLAGS.batch_size)))# Compute the number of iterations per training epoch
 FLAGS.num_classes = len(MetadataCatalog[cfg.DATASETS.TRAIN[0]].stuff_classes)       # Get the number of classes in the current dataset
-FLAGS.available_mem_info = available_mem_info                               # Save the information of available GPU memory in the FLAGS variable
+FLAGS.available_mem_info = available_mem_info.tolist()                      # Save the information of available GPU memory in the FLAGS variable
 cfg = changeConfig_withFLAGS(cfg=cfg, FLAGS=FLAGS)                          # Set the final values for the config
 
 # Create the log file
