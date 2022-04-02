@@ -84,7 +84,7 @@ def changeConfig_withFLAGS(cfg, FLAGS):
     cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST = 0.05                                            # Assign the IoU threshold used for the model
     cfg.INPUT.FORMAT = "BGR"                                                                # The input format is set to be BGR, like the visualization method
     cfg.OUTPUT_DIR = os.path.join(MaskFormer_dir, "output_{:s}{:s}".format("vitrolife_" if "vitro" in FLAGS.dataset_name.lower() else "", FLAGS.output_dir_postfix))    # Get MaskFormer directory and name the output directory
-    config_name = "config_initial.yaml"                                                     # Initial name for the configuration that will be saved in the cfg.OUTPUT_DIR
+    os.makedirs(cfg.OUTPUT_DIR, exist_ok=True)                                              # Create the output folder, if it doesn't already exist
     if "vitrolife" in FLAGS.dataset_name.lower():                                           # If the vitrolife dataset was chosen ...
         cfg.MODEL.SEM_SEG_HEAD.NUM_CLASSES = len(MetadataCatalog[cfg.DATASETS.TEST[0]].stuff_classes)   # Assign the number of classes for the model to segment
         cfg.INPUT.MIN_SIZE_TRAIN = FLAGS.img_size_min                                       # The minimum size length for one side of the training images
@@ -94,9 +94,8 @@ def changeConfig_withFLAGS(cfg, FLAGS):
         cfg.MODEL.PIXEL_MEAN = [100.15, 102.03, 103.89]                                     # Write the correct image mean value for the entire vitrolife dataset
         cfg.MODEL.PIXEL_STD = [57.32, 59.69, 61.93]                                         # Write the correct image standard deviation value for the entire vitrolife dataset
         cfg.SOLVER.STEPS = []                                                               # <<< Deprecated input argument: Use --patience instead >>>
-        cfg.SOLVER.GAMMA = FLAGS.lr_gamma                                                   # After every "step" iterations the learning rate will be updated, as new_lr = old_lr*gamma
-        cfg.SOLVER.STEPS = []#np.subtract([int(x+1)*np.min([500, 2+FLAGS.epoch_iter]) for x in range(500)],1).tolist()             # Insert the 'vitrolife' to the output directory, if using the vitrolife dataset
-        config_name = "vitrolife_" + config_name                                            # Prepend the config name with "vitrolife"
+        cfg.SOLVER.GAMMA = 1                                                                # After every "step" iterations the learning rate will be updated, as new_lr = old_lr*gamma
+        cfg.SOLVER.STEPS = []                                                               # We use no learning rate steps in the config here - those are given later 
     if FLAGS.debugging==True:                                                               # If we are debugging the model ...
         cfg.SOLVER.WEIGHT_DECAY = float(0)                                                  # ... we don't want any weight decay
         cfg.MODEL.MASK_FORMER.DROPOUT = float(0)                                            # ... we don't wany any dropout
@@ -105,12 +104,6 @@ def changeConfig_withFLAGS(cfg, FLAGS):
     cfg.custom_key = []
     for key in vars(FLAGS).keys():
         cfg.custom_key.append(tuple((key, vars(FLAGS)[key])))
-
-    # Write the new config as a .yaml file - it already does, in the output dir...
-    os.makedirs(cfg.OUTPUT_DIR, exist_ok=True)                                              # Create the output folder, if it doesn't already exist
-    with open(os.path.join(cfg.OUTPUT_DIR, config_name), "w") as f:                         # Open a object instance with the config file
-        f.write(cfg.dump())                                                                 # Dump the configuration to a file named config_name in cfg.OUTPUT_DIR
-    f.close()
 
     # Return the custom configuration
     return cfg

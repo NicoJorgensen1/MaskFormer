@@ -114,13 +114,19 @@ def updateLogsFunc(log_file, FLAGS, history, best_val, train_start, epoch_start,
     printAndLog(input_to_write=metrics_val, logs=log_file, oneline=True, prefix="", postfix="\n", length=15)
     if train_mode=="min": new_best = np.min(history[FLAGS.eval_metric])
     if train_mode=="max": new_best = np.max(history[FLAGS.eval_metric])
+    currently_training = any([FLAGS.HPO_current_trial >= FLAGS.num_trials, FLAGS.hp_optim==False])
     if np.abs(new_best-best_val) >= FLAGS.min_delta:
-        printAndLog(input_to_write="{:s}: The {:s} has improved from {:.3f} to {:.3f}".format("{:s} {:>3}".
-                    format("Epoch" if any([FLAGS.HPO_current_trial >= FLAGS.num_trials, FLAGS.hp_optim==False]) else "Trial",
-                    str(epoch)), FLAGS.eval_metric, best_val, new_best), logs=log_file, prefix="", postfix="\n")
+        train_type = "Epoch" if currently_training else "Trial"
+        performance_string = "{:s}{:d}: The {:s} has improved from {:.3f} to {:.3f}".format(train_type.ljust(9), epoch, FLAGS.eval_metric, best_val, new_best)
+        if currently_training == False:
+            study_direction = "minimize" if "loss" in FLAGS.eval_metric else "maximize"
+            if "minimize" in study_direction and new_best < FLAGS.HPO_best_metric: FLAGS.HPO_best_metric = float(new_best)
+            if "maximize" in study_direction and new_best > FLAGS.HPO_best_metric: FLAGS.HPO_best_metric = float(new_best)
+            performance_string = performance_string + ". The best value obtained is: {:.3f}".format(FLAGS.HPO_best_metric)
+        printAndLog(input_to_write=performance_string, logs=log_file, prefix="", postfix="\n")
         best_val = new_best
         best_epoch = epoch
-    if epoch < FLAGS.num_epochs and any([FLAGS.HPO_current_trial >= FLAGS.num_trials, FLAGS.hp_optim==False]):
+    if epoch < FLAGS.num_epochs and currently_training:
         printAndLog(input_to_write=string2, logs=log_file, prefix="")
     return best_val, best_epoch
 

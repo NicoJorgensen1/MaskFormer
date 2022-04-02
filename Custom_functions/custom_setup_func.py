@@ -78,6 +78,7 @@ def changeFLAGS(FLAGS):
     FLAGS.num_queries = 100 if "ade20k" in FLAGS.dataset_name.lower() else 25   # The number of queries will be set to 100 with the ADE20K dataset and 25 with the Vitrolife dataset
     FLAGS.HPO_current_trial = 0                                             # A counter for the number of trials of hyperparameter optimization performed 
     FLAGS.epoch_num = 0                                                     # A counter iterating over the number of epochs 
+    FLAGS.HPO_best_metric = np.inf if "loss" in FLAGS.eval_metric else -np.inf  # Create variable to keep track of the best results obtained when performing HPO
     return FLAGS
 
 # Define a function to extract the final results that will be printed in the log file
@@ -96,6 +97,12 @@ def SaveHistory(historyObject, save_folder, historyName="history"):         # Fu
     pickle.dump(historyObject, hist_file)                                   # Saves the history dictionary 
     hist_file.close()                                                       # Close the pickle again  
 
+# Write the new config as a .yaml file
+def write_config_to_file(config):
+    with open(os.path.join(config.OUTPUT_DIR, "config_file"), "w") as f:    # Open a object instance with the config file
+        f.write(config.dump())                                              # Dump the configuration to a file named config_name in cfg.OUTPUT_DIR
+    f.close()                                                               # Close the writer handle again 
+
 
 # Running the parser function. By doing it like this the FLAGS will get out of the main function
 parser = default_argument_parser()
@@ -111,11 +118,11 @@ parser.add_argument("--img_size_max", type=int, default=500, help="The length of
 parser.add_argument("--resnet_depth", type=int, default=50, help="The depth of the feature extracting ResNet backbone. Possible values: [18,34,50,101] Default: 50")
 parser.add_argument("--batch_size", type=int, default=1, help="The batch size used for training the model. Default: 1")
 parser.add_argument("--num_images", type=int, default=6, help="The number of images to display/segment. Default: 6")
-parser.add_argument("--num_trials", type=int, default=300, help="The number of trials to run HPO for. Only relevant if '--hp_optim==True'. Default: 300")
+parser.add_argument("--num_trials", type=int, default=5, help="The number of trials to run HPO for. Only relevant if '--hp_optim==True'. Default: 300")
 parser.add_argument("--num_random_trials", type=int, default=30, help="The number of random trials to run initiate the HPO for. Only relevant if '--hp_optim==True'. Default: 30")
 parser.add_argument("--display_rate", type=int, default=5, help="The epoch_rate of how often to display image segmentations. A display_rate of 3 means that every third epoch, visual segmentations are saved. Default: 5")
 parser.add_argument("--gpus_used", type=int, default=1, help="The number of GPU's to use for training. Only applicable for training with ADE20K. This input argument deprecates the '--num-gpus' argument. Default: 1")
-parser.add_argument("--num_epochs", type=int, default=50, help="The number of epochs to train the model for. Default: 1")
+parser.add_argument("--num_epochs", type=int, default=5, help="The number of epochs to train the model for. Default: 1")
 parser.add_argument("--warm_up_epochs", type=int, default=3, help="The number of epochs to warm up the learning rate when training. Will go from 1/100 '--learning_rate' to '--learning_rate' during these warm_up_epochs. Default: 2")
 parser.add_argument("--patience", type=int, default=3, help="The number of epochs to accept that the model hasn't improved before lowering the learning rate by a factor '--lr_gamma'. Default: 3")
 parser.add_argument("--early_stop_patience", type=int, default=8, help="The number of epochs to accept that the model hasn't improved before terminating training. Default: 8")

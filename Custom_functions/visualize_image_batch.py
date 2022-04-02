@@ -155,8 +155,8 @@ def visualize_the_images(config, FLAGS, position=[0.55, 0.08, 0.40, 0.75], epoch
         try: fig = move_figure_position(fig=fig, position=position)                 # Try and move the figure to the wanted position (only possible on home computer with a display)
         except: pass                                                                # Except, simply just let the figure retain the current position
         fig_name_init = "Segmented_{:s}_data_samples_from_".format(data_split)      # Initialize the figure name
-        if epoch_num != None: fig_name = "{:s}epoch_{:d}.jpg".format(fig_name_init, epoch_num)                              # If an epoch number has been specified, the figure name will contain that
-        else: fig_name = "{:s}{:s}_training.jpg".format(fig_name_init, "after" if model_done_training else "before")        # Otherwise the visualization happens before/after training
+        if epoch_num is not None: fig_name = "{:s}epoch_{:d}.jpg".format(fig_name_init, epoch_num)                      # If an epoch number has been specified, the figure name will contain that
+        else: fig_name = "{:s}{:s}_training.jpg".format(fig_name_init, "after" if model_done_training else "before")    # Otherwise the visualization happens before/after training
         fig.tight_layout()                                                          # Assures the subplots are plotted tight around each other
         fig.savefig(os.path.join(get_save_dirs(config=config, dataset_split=data_split), fig_name), bbox_inches="tight")    # Save the figure in the correct output directory
         fig_list.append(fig)                                                        # Append the current figure to the list of figures

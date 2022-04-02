@@ -1,4 +1,5 @@
 # Import important libraries
+from asyncio import new_event_loop
 import os 
 import optuna                                                                                       # Library used to perform hyperparameter optimization 
 import numpy as np                                                                                  # For algebraic equations and isnan boolean values
@@ -77,12 +78,12 @@ def perform_HPO():                                                              
         TPE_sampler = optuna.samplers.TPESampler(n_startup_trials=FLAGS.num_random_trials)          # Initiate the search with some random samples to explore the search space, before starting to optimize
         study_name = "Hyperparameter optimization for {:s} dataset".format(FLAGS.dataset_name)      # Unique identifier for the study saved in memory
         storage_file = "sqlite:///{}.db".format(os.path.join(cfg.OUTPUT_DIR, study_name))           # Create a database file in local memory to store the study 
-        
-        study = optuna.create_study(sampler=TPE_sampler, study_name=study_name, direction="maximize", storage=storage_file, load_if_exists=True)    # Needs all these arguments to reload a study ...
+        study_direction = "minimize" if "loss" in FLAGS.eval_metric else "maximize"                 # The direction in which we want the HPO metric to go
+        study = optuna.create_study(sampler=TPE_sampler, study_name=study_name, direction=study_direction, storage=storage_file, load_if_exists=True)    # Needs all these arguments to reload a study ...
         study.optimize(object_func, n_trials=FLAGS.num_trials, callbacks=[lambda study, trial: garb_collect.collect()],
                         catch=(MemoryError, RuntimeError, TypeError, ValueError, ZeroDivisionError), gc_after_trial=True)
-        trial = study.best_trial
-        best_params = trial.params
+        trial = study.best_trial 
+        best_params = trial.params 
         SaveHistory(historyObject=best_params, save_folder=cfg.OUTPUT_DIR, historyName="best_HPO_params")
         printAndLog(input_to_write="Hyperparameter optimization completed.\nBest {:s}: {:.3f}".format(FLAGS.eval_metric, trial.value), logs=log_file, prefix="\n")
         printAndLog(input_to_write="Best hyperparameters: ".ljust(25), logs=log_file)
@@ -100,14 +101,14 @@ def perform_HPO():                                                              
         trials_to_keep = np.asarray(trials_list)[vals_to_keep]
         other_study_name = study_name+"_10_best_10_worst_trials"
         other_storage_file = storage_file.replace(study_name, other_study_name)
-        other_study = optuna.create_study(sampler=TPE_sampler, study_name=other_study_name, direction="maximize", storage=other_storage_file)
+        other_study = optuna.create_study(sampler=TPE_sampler, study_name=other_study_name, direction=study_direction, storage=other_storage_file)
         other_study.add_trials(trials_to_keep)
 
 
         #################### THIS IS JUST NOW FOR DEBUGGING ##########################
         # try:
         #     reload_old_study_storage = storage_file.replace(os.path.basename(cfg.OUTPUT_DIR), "output_vitrolife_13_27_01APR2022")
-        #     reload_old_study = optuna.create_study(sampler=TPE_sampler, study_name=study_name, direction="maximize", storage=reload_old_study_storage, load_if_exists=True)
+        #     reload_old_study = optuna.create_study(sampler=TPE_sampler, study_name=study_name, direction=study_direction, storage=reload_old_study_storage, load_if_exists=True)
         #     study.add_trials(reload_old_study.trials)
         # except: pass
         #################### THIS IS JUST NOW FOR DEBUGGING ##########################

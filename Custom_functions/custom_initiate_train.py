@@ -24,7 +24,7 @@ os.environ["DETECTRON2_DATASETS"] = dataset_dir
 
 # Import important libraries
 from custom_callback_functions import keepAllButLatestAndBestModel                                  # Used for setting model weights on the config
-from custom_setup_func import printAndLog, getBestEpochResults, zip_output                          # Log the results, get metrics from the best epoch and zip output directory
+from custom_setup_func import printAndLog, getBestEpochResults, zip_output, write_config_to_file    # Log the results, get metrics from the best epoch, zip output directory and write config to file
 from custom_train_func import objective_train_func                                                  # Function to launch the training with the given dataset
 from visualize_image_batch import visualize_the_images                                              # Functions visualize the image batch
 from custom_model_analysis_func import analyze_model_func                                           # Analyze the model FLOPS, number of parameters and activations computed
@@ -50,6 +50,7 @@ history, test_history, new_best, best_epoch, cfg = objective_train_func(trial=tr
 
 # Visualize the same images, now after training
 cfg = keepAllButLatestAndBestModel(cfg=cfg, history=history, FLAGS=FLAGS, bestOrLatest="best")      # Put the model weights for the best performing model on the config
+write_config_to_file(config=cfg)                                                                    # Save the config file with the final parameters used in the output dir
 visualize_the_images(config=cfg,FLAGS=FLAGS, data_batches=data_batches, model_done_training=True)   # Visualize the images again
 
 # Print and log the best metric results
