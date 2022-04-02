@@ -11,11 +11,12 @@ from custom_setup_func import printAndLog                                       
 def early_stopping(history, FLAGS, quit_training=False):
     mode = "min" if "loss" in FLAGS.eval_metric.lower() else "max"                  # Whether a lower value or a higher value is better
     metric_monitored = history[FLAGS.eval_metric][-FLAGS.early_stop_patience+1:]    # Getting the last 'early_stop_patience' values of the 'monitor' metric
-    if np.max(history["train_epoch_num"]) > FLAGS.patience+FLAGS.warm_up_epochs:    # If we have run for at least FLAGS.early_stop_patience epochs, we'll continue
+    if np.max(history["train_epoch_num"]) > FLAGS.early_stop_patience+FLAGS.warm_up_epochs: # If we have run for at least FLAGS.early_stop_patience epochs, we'll continue
         if mode=="max": val_used = np.max(metric_monitored)                         # If we monitor an increasing metric, we want to find the largest value
         if mode=="min": val_used = np.min(metric_monitored)                         # If we monitor a decreasing metric, we want to find the smallest value    
         if mode=="max" and val_used <= metric_monitored[0] + FLAGS.min_delta or mode=="min" and val_used >= metric_monitored[0] - FLAGS.min_delta:  # If the model hasn't improved in the last ...
             quit_training = True                                                    # ... 'early_stop_patience' epochs, the training is terminated
+            FLAGS.quit_training = quit_training
     return quit_training
 
 
@@ -126,7 +127,7 @@ def updateLogsFunc(log_file, FLAGS, history, best_val, train_start, epoch_start,
         printAndLog(input_to_write=performance_string, logs=log_file, prefix="", postfix="\n")
         best_val = new_best
         best_epoch = epoch
-    if epoch < FLAGS.num_epochs and currently_training:
+    if all([epoch < FLAGS.num_epochs, currently_training==True, FLAGS.quit_training==False]):
         printAndLog(input_to_write=string2, logs=log_file, prefix="")
     return best_val, best_epoch
 
