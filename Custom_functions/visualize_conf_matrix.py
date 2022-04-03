@@ -66,11 +66,11 @@ def plot_confusion_matrix(config, epoch=0, conf_train=None, conf_val=None, conf_
     fig.savefig(os.path.join(save_folder, fig_name+".jpg"), bbox_inches="tight")                    # Save the figure 
     return fig
 
-im_size = 7
-conf_train=np.random.randint(low=0, high=255, size=(im_size,im_size)).astype(np.uint8)
-conf_val=np.random.randint(low=0, high=255, size=(im_size,im_size)).astype(np.uint8)
+# im_size = 7
+# conf_train=np.random.randint(low=0, high=255, size=(im_size,im_size)).astype(np.uint8)
+# conf_val=np.random.randint(low=0, high=255, size=(im_size,im_size)).astype(np.uint8)
 # conf_test=np.random.randint(low=0, high=255, size=(im_size,im_size)).astype(np.uint8)
-labels = ["Background", "Well", "Zona", "PV space", "Cell", "PN"]
-fig = plot_confusion_matrix(config, epoch=0, conf_train=conf_train, conf_val=conf_val, conf_test=conf_test, done_training=False)
+# labels = ["Background", "Well", "Zona", "PV space", "Cell", "PN"]
+# fig = plot_confusion_matrix(config, epoch=0, conf_train=conf_train, conf_val=conf_val, conf_test=conf_test, done_training=False)
 # fig.savefig(os.path.join(os.path.join(cfg.OUTPUT_DIR, "Visualization", "Confusion matrixes"), "testing"+".jpg"), bbox_inches="tight")
 
