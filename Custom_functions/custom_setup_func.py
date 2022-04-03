@@ -1,12 +1,11 @@
 # Import libraries
-import os
-from string import printable                                                                   # Used to navigate the folder structure in the current os
+import os                                                                   # Used to navigate the folder structure in the current os
 import numpy as np                                                          # Used for computing the iterations per epoch
 import argparse                                                             # Used to parse input arguments through command line
 import pickle                                                               # Used to save the history dictionary after training
 from datetime import datetime                                               # Used to get the current date and time when starting the process
 from shutil import make_archive                                             # Used to zip the directory of the output folder
-from detectron2.data import DatasetCatalog, MetadataCatalog                 # Catalogs over registered datasets and metadatas for all datasets available in Detectron2
+from detectron2.data import DatasetCatalog, MetadataCatalog                 # Catalogs over registered datasets  ...
 from detectron2.engine import default_argument_parser                       # Default argument_parser object
 from GPU_memory_ranked_assigning import assign_free_gpus                    # Function to assign the script to a given number of GPUs
 from register_vitrolife_dataset import register_vitrolife_data_and_metadata_func        # Register the vitrolife dataset and metadata in the Detectron2 dataset catalog
@@ -80,6 +79,7 @@ def changeFLAGS(FLAGS):
     FLAGS.epoch_num = 0                                                     # A counter iterating over the number of epochs 
     FLAGS.HPO_best_metric = np.inf if "loss" in FLAGS.eval_metric else -np.inf  # Create variable to keep track of the best results obtained when performing HPO
     FLAGS.quit_training = False                                             # The initial value for the "quit_training" parameter should be False
+    FLAGS.ignore_label = 0 if FLAGS.ignore_background else 255              # As default no labels will be ignored 
     return FLAGS
 
 # Define a function to extract the final results that will be printed in the log file
@@ -119,8 +119,8 @@ parser.add_argument("--img_size_max", type=int, default=500, help="The length of
 parser.add_argument("--resnet_depth", type=int, default=50, help="The depth of the feature extracting ResNet backbone. Possible values: [18,34,50,101] Default: 50")
 parser.add_argument("--batch_size", type=int, default=1, help="The batch size used for training the model. Default: 1")
 parser.add_argument("--num_images", type=int, default=6, help="The number of images to display/segment. Default: 6")
-parser.add_argument("--num_trials", type=int, default=300, help="The number of trials to run HPO for. Only relevant if '--hp_optim==True'. Default: 300")
-parser.add_argument("--num_random_trials", type=int, default=30, help="The number of random trials to run initiate the HPO for. Only relevant if '--hp_optim==True'. Default: 30")
+parser.add_argument("--num_trials", type=int, default=500, help="The number of trials to run HPO for. Only relevant if '--hp_optim==True'. Default: 300")
+parser.add_argument("--num_random_trials", type=int, default=50, help="The number of random trials to run initiate the HPO for. Only relevant if '--hp_optim==True'. Default: 30")
 parser.add_argument("--display_rate", type=int, default=5, help="The epoch_rate of how often to display image segmentations. A display_rate of 3 means that every third epoch, visual segmentations are saved. Default: 5")
 parser.add_argument("--gpus_used", type=int, default=1, help="The number of GPU's to use for training. Only applicable for training with ADE20K. This input argument deprecates the '--num-gpus' argument. Default: 1")
 parser.add_argument("--num_epochs", type=int, default=50, help="The number of epochs to train the model for. Default: 1")
@@ -135,6 +135,7 @@ parser.add_argument("--backbone_multiplier", type=float, default=0.25, help="The
 parser.add_argument("--dropout", type=float, default=0.10, help="The dropout rate used for the linear layers. Default: 0.10")
 parser.add_argument("--weight_decay", type=float, default=1e-4, help="The weight decay used for the model. Default: 1e-4")
 parser.add_argument("--min_delta", type=float, default=5e-4, help="The minimum improvement the model must have made in order to be accepted as an actual improvement. Default 5e-4")
+parser.add_argument("--ignore_background", type=str2bool, default=False, help="Whether or not we are ignoring the background class. True = Ignore background, False = reward/penalize for background predictions. Default: False")
 parser.add_argument("--crop_enabled", type=str2bool, default=True, help="Whether or not cropping is allowed on the images. Default: True")
 parser.add_argument("--hp_optim", type=str2bool, default=True, help="Whether or not we are initiating the training with a hyperparameter optimization. Default: True")
 parser.add_argument("--inference_only", type=str2bool, default=False, help="Whether or not training is skipped and only inference is run. This input argument deprecates the '--eval_only' argument. Default: False")
@@ -158,11 +159,11 @@ else:                                                                       # Ot
 
 # Create the initial configuration, define FLAGS epoch variables and alter the configuration
 cfg = createVitrolifeConfiguration(FLAGS=FLAGS)                             # Create the custom configuration used to e.g. build the model
-FLAGS.num_train_files = MetadataCatalog[cfg.DATASETS.TRAIN[0]].num_files_in_dataset # Write the number of training files to the FLAGS namespace
+FLAGS.num_train_files = MetadataCatalog[cfg.DATASETS.TRAIN[0]].num_files_in_dataset# Write the number of training files to the FLAGS namespace
 FLAGS.num_val_files = MetadataCatalog[cfg.DATASETS.TEST[0]].num_files_in_dataset    # Write the number of validation files to the FLAGS namespace
 if FLAGS.batch_size > FLAGS.num_train_files: FLAGS.batch_size = FLAGS.num_train_files   # The batch size can't be greater than the number of files in the dataset
 FLAGS.epoch_iter = int(np.floor(np.divide(FLAGS.num_train_files, FLAGS.batch_size)))# Compute the number of iterations per training epoch
-FLAGS.num_classes = len(MetadataCatalog[cfg.DATASETS.TRAIN[0]].stuff_classes)       # Get the number of classes in the current dataset
+FLAGS.num_classes = len(MetadataCatalog[cfg.DATASETS.TRAIN[0]].stuff_classes)   # Get the number of classes in the current dataset
 FLAGS.available_mem_info = available_mem_info.tolist()                      # Save the information of available GPU memory in the FLAGS variable
 cfg = changeConfig_withFLAGS(cfg=cfg, FLAGS=FLAGS)                          # Set the final values for the config
 

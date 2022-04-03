@@ -1,6 +1,5 @@
 import os
 import glob
-from tkinter.tix import Tree
 import pandas as pd
 import numpy as np
 from natsort import natsorted
@@ -91,8 +90,8 @@ def register_vitrolife_data_and_metadata_func(debugging=False):
     assert any(["vitrolife" in x for x in list(MetadataCatalog)]), "Datasets have not been registered correctly"    # Assuring the dataset has been registered correctly
 
 # Test that the function will actually return a list of dicts
-img_mask_list_train = vitrolife_dataset_function(run_mode="train")
-img_mask_list_val = vitrolife_dataset_function(run_mode="val")
-img_mask_list_test = vitrolife_dataset_function(run_mode="test")
+# img_mask_list_train = vitrolife_dataset_function(run_mode="train")
+# img_mask_list_val = vitrolife_dataset_function(run_mode="val")
+# img_mask_list_test = vitrolife_dataset_function(run_mode="test")
 
 

@@ -17,6 +17,7 @@ from custom_callback_functions import early_stopping, lr_scheduler, keepAllButLa
 from custom_pq_eval_func import pq_evaluation                                                               # Used to perform the panoptic quality evaluation on the semantic segmentation results
 from visualize_conf_matrix import plot_confusion_matrix                                                     # Function to plot the available confusion matrixes
 
+
 def setup(cfg):
     setup_logger(output=cfg.OUTPUT_DIR, distributed_rank=comm.get_rank(), name="mask_former")               # Setup a logger for the mask module
     return cfg                                                                                              # Return the completed configuration
@@ -26,7 +27,6 @@ def run_train_func(cfg, run_mode):
     Trainer = My_GoTo_Trainer(cfg)
     Trainer.resume_or_load(resume=False)
     return Trainer.train()
-
 
 # Function to launch the training
 def launch_custom_training(FLAGS, config, dataset, epoch=0, run_mode="train", hyperparameter_opt=False):
@@ -84,6 +84,9 @@ def get_HPO_params(config, FLAGS, trial, hpt_opt=False):
         if FLAGS.use_transformer_backbone==False and FLAGS.use_per_pixel_baseline==False:
             resnet_depth = trial.suggest_categorical(name="resnet_depth", choices=[50, 101])
             FLAGS.resnet_depth = resnet_depth
+        if "vitrolife" in FLAGS.dataset_name:
+            ignore_label = trial.suggest_categorical(name="ignore_label", choices=[0, 255])
+            FLAGS.ignore_label = int(ignore_label)
         config = createVitrolifeConfiguration(FLAGS=FLAGS)
         config = changeConfig_withFLAGS(cfg=config, FLAGS=FLAGS)
     elif all([hpt_opt==False, trial is not None, FLAGS.hp_optim==True]):
@@ -100,6 +103,8 @@ def get_HPO_params(config, FLAGS, trial, hpt_opt=False):
         FLAGS.use_checkpoint = bool(trial.params["use_checkpoint"])
         if FLAGS.use_transformer_backbone==False and FLAGS.use_per_pixel_baseline==False:
             FLAGS.resnet_depth = trial.params["resnet_depth"]
+        if "vitrolife" in FLAGS.dataset_name:
+            FLAGS.ignore_label = int(trial.params["ignore_label"])
         config = createVitrolifeConfiguration(FLAGS=FLAGS)
         config = changeConfig_withFLAGS(cfg=config, FLAGS=FLAGS)
     else: config = deepcopy(config)

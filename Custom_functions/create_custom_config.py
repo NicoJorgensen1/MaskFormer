@@ -87,6 +87,7 @@ def changeConfig_withFLAGS(cfg, FLAGS):
     os.makedirs(cfg.OUTPUT_DIR, exist_ok=True)                                              # Create the output folder, if it doesn't already exist
     if "vitrolife" in FLAGS.dataset_name.lower():                                           # If the vitrolife dataset was chosen ...
         cfg.MODEL.SEM_SEG_HEAD.NUM_CLASSES = len(MetadataCatalog[cfg.DATASETS.TEST[0]].stuff_classes)   # Assign the number of classes for the model to segment
+        cfg.MODEL.SEM_SEG_HEAD.IGNORE_VALUE = FLAGS.ignore_label                            # If we are training on the Vitrolife dataset, HPO will be able to enable/disable whether or not background should be displayed...
         cfg.INPUT.MIN_SIZE_TRAIN = FLAGS.img_size_min                                       # The minimum size length for one side of the training images
         cfg.INPUT.MAX_SIZE_TRAIN = FLAGS.img_size_max                                       # The maximum size length for one side of the training images
         cfg.INPUT.MIN_SIZE_TEST = FLAGS.img_size_min                                        # The minimum size length for one side of the validation images

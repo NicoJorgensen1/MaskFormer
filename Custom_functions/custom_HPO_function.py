@@ -1,5 +1,4 @@
 # Import important libraries
-from asyncio import new_event_loop
 import os 
 import optuna                                                                                       # Library used to perform hyperparameter optimization 
 import numpy as np                                                                                  # For algebraic equations and isnan boolean values
@@ -16,7 +15,7 @@ from custom_callback_functions import computeRemainingTime
 def tweak_figure_of_axes(axes):
     if isinstance(axes, np.ndarray):
         fig = axes[0,0].figure
-        fig.set_size_inches((np.multiply(axes.shape, 5.5)))
+        fig.set_size_inches((np.multiply(axes.shape, (4,5))))
         for row in range(axes.shape[0]):
             for col in range(axes.shape[1]):
                 axes[row,col].xaxis.get_label().set_fontsize(20)
@@ -65,6 +64,10 @@ def object_func(trial):
     if FLAGS.HPO_current_trial < FLAGS.num_trials-1:
         printAndLog(input_to_write=string2, logs=log_file, prefix="")
     FLAGS.HPO_current_trial += 1
+    # Assure we have numeric stability
+    study_direction = "minimize" if "loss" in FLAGS.eval_metric else "maximize"
+    if "minimize" in study_direction:
+        if np.isnan(new_best): new_best = float(1e3)
     return new_best
 
 
@@ -97,12 +100,12 @@ def perform_HPO():                                                              
             if np.isnan(hpo_trial.values[-1]): continue
             trials_list.append(hpo_trial)
             eval_metric_list.append(hpo_trial.values[-1])
-        vals_to_keep = np.unique(np.argsort(eval_metric_list)[:10].tolist() + np.argsort(eval_metric_list)[-10:].tolist())
+        vals_to_keep = np.unique(np.argsort(eval_metric_list)[:5].tolist() + np.argsort(eval_metric_list)[-5:].tolist())
         trials_to_keep = np.asarray(trials_list)[vals_to_keep]
-        other_study_name = study_name+"_10_best_10_worst_trials"
+        other_study_name = study_name+"_5_best_5_worst_trials"
         other_storage_file = storage_file.replace(study_name, other_study_name)
-        other_study = optuna.create_study(sampler=TPE_sampler, study_name=other_study_name, direction=study_direction, storage=other_storage_file)
-        other_study.add_trials(trials_to_keep)
+        small_study = optuna.create_study(sampler=TPE_sampler, study_name=other_study_name, direction=study_direction, storage=other_storage_file)
+        small_study.add_trials(trials_to_keep)
 
 
         #################### THIS IS JUST NOW FOR DEBUGGING ##########################
@@ -114,30 +117,51 @@ def perform_HPO():                                                              
         #################### THIS IS JUST NOW FOR DEBUGGING ##########################
 
         
-        # Plot the results
+        # Plot the results. Some problems have occured earlier, thus all plots are wrapped in try-except loops...
         HPO_fig_folder = os.path.join(cfg.OUTPUT_DIR, "Visualizations", "HPO_figures")
+        params_to_use = ["learning_rate", "dropout", "weight_decay"] if "nico" in MaskFormer_dir.lower() else None
         os.makedirs(HPO_fig_folder, exist_ok=True) 
-        contour_axes = optuna.visualization.matplotlib.plot_contour(study, params=["learning_rate", "dropout", "weight_decay"] if "nico" in MaskFormer_dir.lower() else None, target_name=FLAGS.eval_metric)
-        fig_contour = tweak_figure_of_axes(axes=contour_axes)
-        fig_contour.savefig(os.path.join(HPO_fig_folder, "Contour_plot_of_params.jpg"))
         try:
-            hp_importance_axes = optuna.visualization.matplotlib.plot_param_importances(study, params=["learning_rate", "dropout", "weight_decay"] if "nico" in MaskFormer_dir.lower() else None)
+            contour_axes = optuna.visualization.matplotlib.plot_contour(study, params=params_to_use, target_name=FLAGS.eval_metric)
+            fig_contour = tweak_figure_of_axes(axes=contour_axes)
+            fig_contour.savefig(os.path.join(HPO_fig_folder, "Contour_plot_of_params.jpg"))
+        except Exception as ex:
+            error_string = "An exception of type {} occured while creating the contour plot. Arguments:\n{!r}".format(type(ex).__name__, ex.args)
+            printAndLog(input_to_write=error_string, logs=log_file, prefix="", postfix="\n")
+        try:
+            hp_importance_axes = optuna.visualization.matplotlib.plot_param_importances(study, params=params_to_use)
             fig_hp_importance = tweak_figure_of_axes(axes=hp_importance_axes)
             fig_hp_importance.savefig(os.path.join(HPO_fig_folder, "Importance_of_hyperparameters.jpg"), bbox_inches="tight")
         except Exception as ex:
-            error_string = "An exception of type {} occured while creating param_importance_plot. Arguments:\n{!r}".format(type(ex).__name__, ex.args)
+            error_string = "An exception of type {} occured while creating the param_importance_plot. Arguments:\n{!r}".format(type(ex).__name__, ex.args)
             printAndLog(input_to_write=error_string, logs=log_file, prefix="", postfix="\n")
-        optim_axes = optuna.visualization.matplotlib.plot_optimization_history(study)
-        fig_optim = tweak_figure_of_axes(axes=optim_axes)
-        fig_optim.savefig(os.path.join(HPO_fig_folder, "Optimization_history.jpg"), bbox_inches="tight")
-        parallel_axes = optuna.visualization.matplotlib.plot_parallel_coordinate(study, params=["learning_rate", "dropout", "weight_decay"] if "nico" in MaskFormer_dir.lower() else None, target_name=FLAGS.eval_metric)
-        fig_parallel = tweak_figure_of_axes(axes=parallel_axes)
-        fig_parallel.savefig(os.path.join(HPO_fig_folder, "Parallel_axes.jpg"), bbox_inches="tight")
-        parallel_axes2 = optuna.visualization.matplotlib.plot_parallel_coordinate(other_study, params=["learning_rate", "dropout", "weight_decay"] if "nico" in MaskFormer_dir.lower() else None, target_name=FLAGS.eval_metric)
-        fig_parallel2 = tweak_figure_of_axes(axes=parallel_axes2)
-        fig_parallel2.savefig(os.path.join(HPO_fig_folder, "Parallel_axes_10_best_10_worst.jpg"), bbox_inches="tight")
-        EDF_axes = optuna.visualization.matplotlib.plot_edf(study, target_name=FLAGS.eval_metric)
-        fig_EDF = tweak_figure_of_axes(axes=EDF_axes)
-        fig_EDF.savefig(os.path.join(HPO_fig_folder, "Empirical_Distribution_Plot.jpg"), bbox_inches="tight")
+        try:
+            optim_axes = optuna.visualization.matplotlib.plot_optimization_history(study)
+            fig_optim = tweak_figure_of_axes(axes=optim_axes)
+            fig_optim.savefig(os.path.join(HPO_fig_folder, "Optimization_history.jpg"), bbox_inches="tight")
+        except Exception as ex:
+            error_string = "An exception of type {} occured while creating the plot_optimization_history plot. Arguments:\n{!r}".format(type(ex).__name__, ex.args)
+            printAndLog(input_to_write=error_string, logs=log_file, prefix="", postfix="\n")            
+        try:
+            parallel_axes = optuna.visualization.matplotlib.plot_parallel_coordinate(study, params=params_to_use, target_name=FLAGS.eval_metric)
+            fig_parallel = tweak_figure_of_axes(axes=parallel_axes)
+            fig_parallel.savefig(os.path.join(HPO_fig_folder, "Parallel_axes.jpg"), bbox_inches="tight")
+        except Exception as ex:
+            error_string = "An exception of type {} occured while creating parallel_coordinates_plot for all trials. Arguments:\n{!r}".format(type(ex).__name__, ex.args)
+            printAndLog(input_to_write=error_string, logs=log_file, prefix="", postfix="\n")
+        try:
+            parallel_axes2 = optuna.visualization.matplotlib.plot_parallel_coordinate(small_study, params=params_to_use, target_name=FLAGS.eval_metric)
+            fig_parallel2 = tweak_figure_of_axes(axes=parallel_axes2)
+            fig_parallel2.savefig(os.path.join(HPO_fig_folder, "Parallel_axes_10_best_10_worst.jpg"), bbox_inches="tight")
+        except Exception as ex:
+            error_string = "An exception of type {} occured while creating parallel_coordinates_plot for the 10 best and 10 worst trials. Arguments:\n{!r}".format(type(ex).__name__, ex.args)
+            printAndLog(input_to_write=error_string, logs=log_file, prefix="", postfix="\n")
+        try:
+            EDF_axes = optuna.visualization.matplotlib.plot_edf(study, target_name=FLAGS.eval_metric)
+            fig_EDF = tweak_figure_of_axes(axes=EDF_axes)
+            fig_EDF.savefig(os.path.join(HPO_fig_folder, "Empirical_Distribution_Plot.jpg"), bbox_inches="tight")
+        except Exception as ex:
+            error_string = "An exception of type {} occured while creating EDF plot. Arguments:\n{!r}".format(type(ex).__name__, ex.args)
+            printAndLog(input_to_write=error_string, logs=log_file, prefix="", postfix="\n")
 
     return FLAGS, cfg, trial, log_file

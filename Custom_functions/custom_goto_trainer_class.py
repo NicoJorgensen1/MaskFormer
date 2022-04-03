@@ -16,6 +16,7 @@ from fvcore.common.param_scheduler import CosineParamScheduler
 from fvcore.nn.precise_bn import get_bn_modules
 from PIL import Image
 
+
 # Define a function that will return a list of augmentations to use for training
 def custom_augmentation_mapper(config, is_train=True):
     if "val" in config.DATASETS.TRAIN[0].lower(): transform_list = []       # If we are validating the images, we won't use data augmentation

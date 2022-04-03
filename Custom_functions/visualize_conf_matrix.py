@@ -48,6 +48,7 @@ def plot_confusion_matrix(config, epoch=0, conf_train=None, conf_val=None, conf_
                 xticklabels=labels, yticklabels=labels, xlabel="Predicted labels", ylabel="True labels")    # ... including tick labels
             ax.set_title("{:s}".format(split+tit_ext+" confusion matrix"), fontdict_title)          # Set the title for the confusion matrix
             ax.tick_params(axis='both', labelrotation = 45, width=1, pad=0, labelsize=10)           # https://matplotlib.org/3.1.1/api/_as_gen/matplotlib.axes.Axes.tick_params.html
+            ax.grid(False)                                                                          # Remove the grid from the confusion matrix 
             axe = make_axes_locatable(ax)                                                           # Extracts the current axes
             cax = axe.append_axes('right', size='5%', pad=0.05)                                     # Padding with some extra space next to the axes
             fig.colorbar(im, cax=cax, orientation='vertical')                                       # Creates the colorbar
@@ -65,10 +66,11 @@ def plot_confusion_matrix(config, epoch=0, conf_train=None, conf_val=None, conf_
     fig.savefig(os.path.join(save_folder, fig_name+".jpg"), bbox_inches="tight")                    # Save the figure 
     return fig
 
-# conf_train=np.random.randint(low=0, high=255, size=(6,6)).astype(np.uint8)
-# conf_val=np.random.randint(low=0, high=255, size=(6,6)).astype(np.uint8)
-# conf_test=np.random.randint(low=0, high=255, size=(6,6)).astype(np.uint8)
-# labels = ["Background", "Well", "Zona", "PV space", "Cell", "PN"]
-# fig = plot_confusion_matrix(labels=labels, conf_train=conf_train, conf_val=conf_val, conf_test=conf_test)
-# fig.show()
+im_size = 7
+conf_train=np.random.randint(low=0, high=255, size=(im_size,im_size)).astype(np.uint8)
+conf_val=np.random.randint(low=0, high=255, size=(im_size,im_size)).astype(np.uint8)
+# conf_test=np.random.randint(low=0, high=255, size=(im_size,im_size)).astype(np.uint8)
+labels = ["Background", "Well", "Zona", "PV space", "Cell", "PN"]
+fig = plot_confusion_matrix(config, epoch=0, conf_train=conf_train, conf_val=conf_val, conf_test=conf_test, done_training=False)
+# fig.savefig(os.path.join(os.path.join(cfg.OUTPUT_DIR, "Visualization", "Confusion matrixes"), "testing"+".jpg"), bbox_inches="tight")
 
