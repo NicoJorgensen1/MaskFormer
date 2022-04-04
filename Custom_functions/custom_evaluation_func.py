@@ -44,10 +44,10 @@ def evaluateResults(FLAGS, cfg, data_split="train",  dataloader=None, evaluator=
     # Build the dataloader if no dataloader has been sent to the function as an input
     if dataloader is None:                                                                                  # If no dataloader has been inputted to the function ...
         dataloader = iter(build_detection_train_loader(DatasetCatalog.get(dataset_name),                    # ... create the dataloader for evaluation ...
-            mapper=DatasetMapper(config, is_train=False, augmentations=[]), total_batch_size=1, num_workers=2))    # ... with batch_size = 1 and no augmentation on the mapper
+            mapper=DatasetMapper(cfg, is_train=False, augmentations=[]), total_batch_size=1, num_workers=2))    # ... with batch_size = 1 and no augmentation on the mapper
     
     # Create the predictor and evaluator instances
-    predictor = DefaultPredictor(cfg=config)
+    predictor = DefaultPredictor(cfg=cfg)
     if evaluator is None: evaluator = My_Evaluator(dataset_name=dataset_name, output_dir=pred_out_dir)      # If no evaluator has been sent into the function, crate a new one
     evaluator.reset()                                                                                       # Reset the evaluator, i.e. remove all earlier computations and confusion matrixes
 
