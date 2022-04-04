@@ -116,7 +116,7 @@ parser.add_argument("--num_workers", type=int, default=6, help="Number of worker
 parser.add_argument("--max_iter", type=int, default=int(1e5), help="Maximum number of iterations to train the model for. <<Deprecated argument. Use 'num_epochs' instead>>. Default: 100000")
 parser.add_argument("--img_size_min", type=int, default=500, help="The length of the smallest size of the training images. Default: 500")
 parser.add_argument("--img_size_max", type=int, default=500, help="The length of the largest size of the training images. Default: 500")
-parser.add_argument("--resnet_depth", type=int, default=50, help="The depth of the feature extracting ResNet backbone. Possible values: [18,34,50,101] Default: 50")
+parser.add_argument("--resnet_depth", type=int, default=101, help="The depth of the feature extracting ResNet backbone. Possible values: [18,34,50,101] Default: 101")
 parser.add_argument("--batch_size", type=int, default=1, help="The batch size used for training the model. Default: 1")
 parser.add_argument("--num_images", type=int, default=6, help="The number of images to display/segment. Default: 6")
 parser.add_argument("--num_trials", type=int, default=500, help="The number of trials to run HPO for. Only relevant if '--hp_optim==True'. Default: 300")
@@ -161,7 +161,7 @@ else:                                                                       # Ot
 cfg = createVitrolifeConfiguration(FLAGS=FLAGS)                             # Create the custom configuration used to e.g. build the model
 FLAGS.num_train_files = MetadataCatalog[cfg.DATASETS.TRAIN[0]].num_files_in_dataset# Write the number of training files to the FLAGS namespace
 FLAGS.num_val_files = MetadataCatalog[cfg.DATASETS.TEST[0]].num_files_in_dataset    # Write the number of validation files to the FLAGS namespace
-if FLAGS.batch_size > FLAGS.num_train_files: FLAGS.batch_size = FLAGS.num_train_files   # The batch size can't be greater than the number of files in the dataset
+FLAGS.batch_size = np.min([FLAGS.batch_size, FLAGS.num_train_files])        # The batch size can't be greater than the number of files in the dataset
 FLAGS.epoch_iter = int(np.floor(np.divide(FLAGS.num_train_files, FLAGS.batch_size)))# Compute the number of iterations per training epoch
 FLAGS.num_classes = len(MetadataCatalog[cfg.DATASETS.TRAIN[0]].stuff_classes)   # Get the number of classes in the current dataset
 FLAGS.available_mem_info = available_mem_info.tolist()                      # Save the information of available GPU memory in the FLAGS variable

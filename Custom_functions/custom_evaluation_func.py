@@ -3,6 +3,7 @@ import sys
 import os
 import torch
 import numpy as np
+from copy import deepcopy
 from detectron2.data import DatasetCatalog, DatasetMapper, build_detection_train_loader
 from detectron2.evaluation import SemSegEvaluator
 from detectron2.engine.defaults import DefaultPredictor
@@ -41,13 +42,13 @@ def evaluateResults(FLAGS, cfg, data_split="train",  dataloader=None, evaluator=
     os.makedirs(pred_out_dir, exist_ok=True)                                                                # Create the evaluation folder, if it doesn't already exist
 
     # Build the dataloader if no dataloader has been sent to the function as an input
-    if dataloader == None:                                                                                  # If no dataloader has been inputted to the function ...
+    if dataloader is None:                                                                                  # If no dataloader has been inputted to the function ...
         dataloader = iter(build_detection_train_loader(DatasetCatalog.get(dataset_name),                    # ... create the dataloader for evaluation ...
-            mapper=DatasetMapper(cfg, is_train=False, augmentations=[]), total_batch_size=1, num_workers=2))    # ... with batch_size = 1 and no augmentation on the mapper
+            mapper=DatasetMapper(config, is_train=False, augmentations=[]), total_batch_size=1, num_workers=2))    # ... with batch_size = 1 and no augmentation on the mapper
     
     # Create the predictor and evaluator instances
-    predictor = DefaultPredictor(cfg=cfg)
-    if evaluator == None: evaluator = My_Evaluator(dataset_name=dataset_name, output_dir=pred_out_dir)      # If no evaluator has been sent into the function, crate a new one
+    predictor = DefaultPredictor(cfg=config)
+    if evaluator is None: evaluator = My_Evaluator(dataset_name=dataset_name, output_dir=pred_out_dir)      # If no evaluator has been sent into the function, crate a new one
     evaluator.reset()                                                                                       # Reset the evaluator, i.e. remove all earlier computations and confusion matrixes
 
     # Create a progress bar to keep track on the evaluation

@@ -57,7 +57,7 @@ def createVitrolifeConfiguration(FLAGS):
 def changeConfig_withFLAGS(cfg, FLAGS):
     if FLAGS.use_checkpoint == False: cfg.MODEL.WEIGHTS = ""                                # If the model must be trained without using earlier checkpoints, any earlier checkpoint must be removed...
     cfg.SOLVER.BASE_LR = FLAGS.learning_rate                                                # Starting learning rate
-    cfg.SOLVER.IMS_PER_BATCH = FLAGS.batch_size                                             # Batch size used when training => batch_size pr GPU = batch_size // num_gpus
+    cfg.SOLVER.IMS_PER_BATCH = int(FLAGS.batch_size)                                        # Batch size used when training => batch_size pr GPU = batch_size // num_gpus
     cfg.SOLVER.MAX_ITER = FLAGS.epoch_iter                                                  # <<< Deprecated input argument: Use --num_epochs instead >>>
     cfg.SOLVER.LR_SCHEDULER_NAME = "WarmupCosineLR"                                         # Default learning rate scheduler
     cfg.SOLVER.OPTIMIZER = FLAGS.optimizer_used.upper()                                     # The optimizer to use for training the model

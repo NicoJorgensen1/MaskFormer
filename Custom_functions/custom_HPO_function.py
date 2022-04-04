@@ -27,7 +27,7 @@ def tweak_figure_of_axes(axes):
                     tick.set_fontsize(15)
     if hasattr(axes, "plot"):
         fig = axes.figure
-        fig.set_size_inches((18,12))
+        fig.set_size_inches((18,11))
         axes.xaxis.get_label().set_fontsize(15)
         axes.yaxis.get_label().set_fontsize(15)
         axes.title.set_fontsize(30)
@@ -35,6 +35,7 @@ def tweak_figure_of_axes(axes):
             tick.set_fontsize(15)
         for tick in axes.yaxis.get_ticklabels():
             tick.set_fontsize(15)
+        fig.tg
     return fig
 
 
