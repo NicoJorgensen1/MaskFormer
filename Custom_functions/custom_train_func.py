@@ -127,7 +127,9 @@ def objective_train_func(trial, FLAGS, cfg, logs, data_batches=None, hyperparame
     conf_matrix_train, conf_matrix_val, conf_matrix_test = None, None, None                                 # Initialize the confusion matrixes as None values 
     train_dataset = cfg.DATASETS.TRAIN                                                                      # Get the training dataset name
     val_dataset = cfg.DATASETS.TEST                                                                         # Get the validation dataset name
-    lr_update_check = np.zeros((FLAGS.patience, 1), dtype=bool)                                             # Preallocating array to determine whether or not the learning rate was updated
+    if isinstance(train_dataset, tuple): train_dataset = train_dataset[0]                                   # Make sure the dataset variable is a string
+    if isinstance(val_dataset, tuple): val_dataset = val_dataset[0]                                         # Make sure the training dataset variable is a string
+    lr_update_check = np.zeros((FLAGS.patience, 1), dtype=bool)                                             # Preallocating validation array to determine whether or not the learning rate was updated
     quit_training = False                                                                                   # Boolean value determining whether or not to commit early stopping
     epochs_to_run = 1 if hyperparameter_optimization else FLAGS.num_epochs                                  # We'll run only 1 epoch if we are performing HPO
     train_start_time = time()                                                                               # Now the training starts
