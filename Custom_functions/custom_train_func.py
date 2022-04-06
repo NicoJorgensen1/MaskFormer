@@ -31,7 +31,7 @@ def run_train_func(cfg, run_mode):
 # Function to launch the training
 def launch_custom_training(FLAGS, config, dataset, epoch=0, run_mode="train", hyperparameter_opt=False):
     FLAGS.epoch_iter = int(np.floor(np.divide(FLAGS.num_train_files, FLAGS.batch_size)))                    # Compute the number of iterations per training epoch with the given batch size
-    config.SOLVER.MAX_ITER = FLAGS.epoch_iter * (4 if all(["train" in run_mode, epoch>0, "vitrolife" in dataset]) else 2)   # Increase training iteration count for precise BN computations
+    config.SOLVER.MAX_ITER = FLAGS.epoch_iter * (5 if all(["train" in run_mode, epoch>0, "vitrolife" in dataset]) else 2)   # Increase training iteration count for precise BN computations
     if all(["train" in run_mode, hyperparameter_opt==True]):
         if "vitrolife" in dataset: config.SOLVER.MAX_ITER = int(FLAGS.epoch_iter * (1.50 if FLAGS.use_per_pixel_baseline else 3))   # ... Transformer and ResNet backbones need a ...
         elif "ade20k" in dataset: config.SOLVER.MAX_ITER = int(FLAGS.epoch_iter * (1 if FLAGS.use_per_pixel_baseline else 2)/20)    # ... little more data to do well while searching...
