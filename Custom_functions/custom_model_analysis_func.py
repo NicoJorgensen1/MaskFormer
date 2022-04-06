@@ -2,7 +2,6 @@
 # Copyright (c) Facebook, Inc. and its affiliates.
 # Modified by Bowen Cheng from https://github.com/facebookresearch/detectron2/blob/main/tools/analyze_model.py
 
-from ast import arg, parse
 import logging
 import numpy as np
 from collections import Counter

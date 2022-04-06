@@ -44,7 +44,7 @@ class CosineParamScheduler2(CosineParamScheduler):
     
     def __call__(self, where):
         where = float(where)
-        new_lr = float(np.add(self._end_value, np.multiply(np.multiply(0.5, np.subtract(self._start_value, self._end_value)), (np.add(1, np.cos(np.multiply(np.pi, where)))))))
+        new_lr = float(np.add(self._end_value, np.multiply(np.multiply(0.75, np.subtract(self._start_value, self._end_value)), (np.add(1, np.cos(np.multiply(np.pi, where)))))))
         # new_lr = float(self._end_value + 0.5 * (self._start_value - self._end_value) * (1 + np.cos(np.pi * where)))
         return new_lr
 
@@ -71,16 +71,15 @@ class My_GoTo_Trainer(DefaultTrainer):
             if "num_trials" in item[0]: num_trials = item[1]                                                    # Get the total number of HPO trials to run
             if "HPO_current_trial" in item[0]: HPO_current_trial = item[1]                                      # Get the current HPO trial 
             if "hp_optim" in item[0]: do_HPO_bool = item[1]                                                     # Get the variable as whether or not we are doing HPO
-        # if do_HPO_bool==True: current_epoch -= num_trials                                                       # As every trial counts as an epoch, the "correct" number of epochs needs to get trial_num subtracted
         if all([HPO_current_trial < num_trials, do_HPO_bool==True]):                                            # If we are still in the HPO trials ...
             start_val, end_val = 1, 1                                                                           # ... then the learning rate will be constant
         elif warm_ups >= current_epoch:                                                                         # If we are still in the warm up phase ...
-            learn_rates = np.linspace(start=np.divide(wanted_lr, 100), stop=wanted_lr, num=warm_ups+1)          # ... we'll create an array of the possible learning rates to choose from
+            learn_rates = np.linspace(start=np.divide(wanted_lr, 50), stop=wanted_lr, num=warm_ups+1)           # ... we'll create an array of the possible learning rates to choose from
             learn_rates = np.multiply(learn_rates, np.divide(1, wanted_lr))                                     # For some reason necessary ... 
             start_val = learn_rates[current_epoch-1]                                                            # ... and then choose the starting learning rate as the lower one
             end_val = learn_rates[current_epoch]                                                                # ... and then choose the next learning rate as the higher one
         elif warm_ups < current_epoch:                                                                          # Instead if we are in the regular training period ...
-            start_val, end_val = float(1), float(0.5)                                                           # Then the learning rate will be cyclical between '--learning_rate' and '0.5 * --learning_rate'
+            start_val, end_val = float(1), float(0.75)                                                          # Then the learning rate will be cyclical between '--learning_rate' and '0.5 * --learning_rate'
         if "train" not in cfg.DATASETS.TRAIN[0]: start_val, end_val = 0, 0                                      # If we are using the validation or test set, then learning rates are set to 0
         
         sched = CosineParamScheduler2(start_value=start_val, end_value=end_val)
@@ -178,7 +177,7 @@ class My_GoTo_Trainer(DefaultTrainer):
         dataset_used = cfg.DATASETS.TRAIN[0]                                        # Get the current dataset
         if "val" in dataset_used: cfg.TEST.PRECISE_BN.ENABLED = False               # If we are in validation, precise_bn is disabled
         num_files = MetadataCatalog[dataset_used].num_files_in_dataset              # Read the number of files of the used dataset
-        precise_bn_period = int(num_files/2) if num_files < 501 else 250            # Every 250 iteration the PreciseBN will be calculated
+        precise_bn_period = int(num_files/2) if num_files < 51 else 25              # Every 25 iteration the PreciseBN will be calculated
 
 
         ret = [
@@ -199,8 +198,6 @@ class My_GoTo_Trainer(DefaultTrainer):
         if comm.is_main_process():
             # Here the default print/log frequency of each writer is used.
             # run writers in the end, so that evaluation metrics are written
-            write_period = int(np.min([20, MetadataCatalog[self.cfg.DATASETS.TRAIN[0]].num_files_in_dataset/np.min([25, MetadataCatalog[self.cfg.DATASETS.TRAIN[0]].num_files_in_dataset])]))
+            write_period = int(np.min([10, MetadataCatalog[self.cfg.DATASETS.TRAIN[0]].num_files_in_dataset/np.min([75, MetadataCatalog[self.cfg.DATASETS.TRAIN[0]].num_files_in_dataset])]))
             ret.append(PeriodicWriter(self.build_writers(), period=write_period))
         return ret
-
-        

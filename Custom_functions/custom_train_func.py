@@ -31,9 +31,9 @@ def run_train_func(cfg, run_mode):
 # Function to launch the training
 def launch_custom_training(FLAGS, config, dataset, epoch=0, run_mode="train", hyperparameter_opt=False):
     FLAGS.epoch_iter = int(np.floor(np.divide(FLAGS.num_train_files, FLAGS.batch_size)))                    # Compute the number of iterations per training epoch with the given batch size
-    config.SOLVER.MAX_ITER = FLAGS.epoch_iter * (10 if all(["train" in run_mode, epoch>0, "vitrolife" in dataset]) else 2)  # Increase training iteration count for precise BN computations
+    config.SOLVER.MAX_ITER = FLAGS.epoch_iter * (4 if all(["train" in run_mode, epoch>0, "vitrolife" in dataset]) else 2)   # Increase training iteration count for precise BN computations
     if all(["train" in run_mode, hyperparameter_opt==True]):
-        if "vitrolife" in dataset: config.SOLVER.MAX_ITER = int(FLAGS.epoch_iter * (1.25 if FLAGS.use_per_pixel_baseline else 2.5)) # ... Transformer and ResNet backbones need a ...
+        if "vitrolife" in dataset: config.SOLVER.MAX_ITER = int(FLAGS.epoch_iter * (1.50 if FLAGS.use_per_pixel_baseline else 3))   # ... Transformer and ResNet backbones need a ...
         elif "ade20k" in dataset: config.SOLVER.MAX_ITER = int(FLAGS.epoch_iter * (1 if FLAGS.use_per_pixel_baseline else 2)/20)    # ... little more data to do well while searching...
     config.SOLVER.CHECKPOINT_PERIOD = config.SOLVER.MAX_ITER                                                # Save a new model checkpoint after each epoch
     if "train" in run_mode and hyperparameter_opt==False:                                                   # If we are training ... 
@@ -59,16 +59,16 @@ def launch_custom_training(FLAGS, config, dataset, epoch=0, run_mode="train", hy
 def get_HPO_params(config, FLAGS, trial, hpt_opt=False):
     # If we are performing hyperparameter optimization, the config should be updated
     if all([hpt_opt==True, trial is not None, FLAGS.hp_optim==True]):
-        lr = trial.suggest_float(name="learning_rate", low=1e-7, high=5e-3)
+        lr = trial.suggest_float(name="learning_rate", low=1e-6, high=5e-3)
         batch_size = trial.suggest_int(name="batch_size", low=1, high=1 if "nico" in os.getenv("DETECTRON2_DATASETS").lower() else int(np.ceil(np.min(FLAGS.available_mem_info)/1000)))
         optimizer_used = trial.suggest_categorical(name="optimizer_used", choices=["ADAMW", "SGD"])
-        weight_decay = trial.suggest_float(name="weight_decay", low=1e-7, high=1e-2)
+        weight_decay = trial.suggest_float(name="weight_decay", low=1e-8, high=2e-2)
         dice_loss_weight = trial.suggest_int(name="dice_loss_weight", low=2, high=25)
         mask_loss_weight = trial.suggest_int(name="mask_loss_weight", low=2, high=25)
-        dropout = trial.suggest_float(name="dropout", low=1e-6, high=0.5)
-        num_queries = trial.suggest_int(name="num_queries", low=15, high=150)
+        dropout = trial.suggest_float(name="dropout", low=1e-8, high=0.5)
         use_checkpoint = trial.suggest_categorical(name="use_checkpoint", choices=["True", "False"])
-        backbone_multiplier = trial.suggest_float("backbone_multiplier", low=1e-4, high=0.5)
+        backbone_multiplier = trial.suggest_float("backbone_multiplier", low=1e-6, high=0.5)
+        backbone_freeze_layers = trial.suggest_int(name="backbone_freeze", low=0, high=5)
 
         # Change the FLAGS parameters and then change the config
         FLAGS.learning_rate = lr
@@ -79,11 +79,14 @@ def get_HPO_params(config, FLAGS, trial, hpt_opt=False):
         FLAGS.dice_loss_weight = dice_loss_weight
         FLAGS.mask_loss_weight = mask_loss_weight
         FLAGS.dropout = dropout
-        FLAGS.num_queries = num_queries
+        if "vitrolife" in FLAGS.dataset_name:
+            num_queries = trial.suggest_int(name="num_queries", low=15, high=150)
+            FLAGS.num_queries = num_queries
         FLAGS.use_checkpoint = bool(use_checkpoint)
         if FLAGS.use_transformer_backbone==False and FLAGS.use_per_pixel_baseline==False:
             resnet_depth = trial.suggest_categorical(name="resnet_depth", choices=[50, 101])
             FLAGS.resnet_depth = resnet_depth
+            FLAGS.backbone_freeze_layers = backbone_freeze_layers
         config = createVitrolifeConfiguration(FLAGS=FLAGS)
         config = changeConfig_withFLAGS(cfg=config, FLAGS=FLAGS)
     elif all([hpt_opt==False, trial is not None, FLAGS.hp_optim==True]):
@@ -96,10 +99,12 @@ def get_HPO_params(config, FLAGS, trial, hpt_opt=False):
         FLAGS.dice_loss_weight = trial.params["dice_loss_weight"]
         FLAGS.mask_loss_weight = trial.params["mask_loss_weight"]
         FLAGS.dropout = trial.params["dropout"]
-        FLAGS.num_queries = trial.params["num_queries"]
+        if "vitrolife" in FLAGS.dataset_name:
+            FLAGS.num_queries = trial.params["num_queries"]
         FLAGS.use_checkpoint = bool(trial.params["use_checkpoint"])
         if FLAGS.use_transformer_backbone==False and FLAGS.use_per_pixel_baseline==False:
             FLAGS.resnet_depth = trial.params["resnet_depth"]
+            FLAGS.backbone_freeze_layers = trial.params["backbone_freeze"]
         config = createVitrolifeConfiguration(FLAGS=FLAGS)
         config = changeConfig_withFLAGS(cfg=config, FLAGS=FLAGS)
     else: config = deepcopy(config)
