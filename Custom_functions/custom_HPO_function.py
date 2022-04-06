@@ -35,7 +35,6 @@ def tweak_figure_of_axes(axes):
             tick.set_fontsize(15)
         for tick in axes.yaxis.get_ticklabels():
             tick.set_fontsize(15)
-        fig.tg
     return fig
 
 

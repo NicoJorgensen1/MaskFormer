@@ -68,7 +68,6 @@ def get_HPO_params(config, FLAGS, trial, hpt_opt=False):
         dropout = trial.suggest_float(name="dropout", low=1e-8, high=0.5)
         use_checkpoint = trial.suggest_categorical(name="use_checkpoint", choices=["True", "False"])
         backbone_multiplier = trial.suggest_float("backbone_multiplier", low=1e-6, high=0.5)
-        backbone_freeze_layers = trial.suggest_int(name="backbone_freeze", low=0, high=5)
 
         # Change the FLAGS parameters and then change the config
         FLAGS.learning_rate = lr
@@ -80,11 +79,12 @@ def get_HPO_params(config, FLAGS, trial, hpt_opt=False):
         FLAGS.mask_loss_weight = mask_loss_weight
         FLAGS.dropout = dropout
         if "vitrolife" in FLAGS.dataset_name:
-            num_queries = trial.suggest_int(name="num_queries", low=15, high=150)
+            num_queries = trial.suggest_int(name="num_queries", low=15, high=150) 
             FLAGS.num_queries = num_queries
         FLAGS.use_checkpoint = bool(use_checkpoint)
-        if FLAGS.use_transformer_backbone==False and FLAGS.use_per_pixel_baseline==False:
+        if FLAGS.use_transformer_backbone==False:
             resnet_depth = trial.suggest_categorical(name="resnet_depth", choices=[50, 101])
+            backbone_freeze_layers = trial.suggest_int(name="backbone_freeze", low=0, high=5)
             FLAGS.resnet_depth = resnet_depth
             FLAGS.backbone_freeze_layers = backbone_freeze_layers
         config = createVitrolifeConfiguration(FLAGS=FLAGS)
@@ -102,7 +102,7 @@ def get_HPO_params(config, FLAGS, trial, hpt_opt=False):
         if "vitrolife" in FLAGS.dataset_name:
             FLAGS.num_queries = trial.params["num_queries"]
         FLAGS.use_checkpoint = bool(trial.params["use_checkpoint"])
-        if FLAGS.use_transformer_backbone==False and FLAGS.use_per_pixel_baseline==False:
+        if FLAGS.use_transformer_backbone==False:
             FLAGS.resnet_depth = trial.params["resnet_depth"]
             FLAGS.backbone_freeze_layers = trial.params["backbone_freeze"]
         config = createVitrolifeConfiguration(FLAGS=FLAGS)
