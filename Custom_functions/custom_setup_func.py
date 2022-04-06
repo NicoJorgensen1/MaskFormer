@@ -127,6 +127,7 @@ parser.add_argument("--num_epochs", type=int, default=75, help="The number of ep
 parser.add_argument("--warm_up_epochs", type=int, default=3, help="The number of epochs to warm up the learning rate when training. Will go from 1/100 '--learning_rate' to '--learning_rate' during these warm_up_epochs. Default: 3")
 parser.add_argument("--patience", type=int, default=5, help="The number of epochs to accept that the model hasn't improved before lowering the learning rate by a factor '--lr_gamma'. Default: 5")
 parser.add_argument("--early_stop_patience", type=int, default=12, help="The number of epochs to accept that the model hasn't improved before terminating training. Default: 12")
+parser.add_argument("--backbone_freeze_layers", type=int, default=0, help="The number of layers in the backbone to freeze when training. Available [0,1,2,3,4,5]. Default: 0")
 parser.add_argument("--dice_loss_weight", type=int, default=10, help="The weighting for the dice loss in the loss function. Default: 10")
 parser.add_argument("--mask_loss_weight", type=int, default=20, help="The weighting for the mask loss in the loss function. Default: 20")
 parser.add_argument("--learning_rate", type=float, default=1e-3, help="The initial learning rate used for training the model. Default: 1e-3")
@@ -141,8 +142,8 @@ parser.add_argument("--hp_optim", type=str2bool, default=True, help="Whether or 
 parser.add_argument("--inference_only", type=str2bool, default=False, help="Whether or not training is skipped and only inference is run. This input argument deprecates the '--eval_only' argument. Default: False")
 parser.add_argument("--display_images", type=str2bool, default=False, help="Whether or not some random sample images are displayed before training starts. Default: False")
 parser.add_argument("--use_checkpoint", type=str2bool, default=False, help="Whether or not we are loading weights from a model checkpoint file before training. Default: False")
-parser.add_argument("--use_transformer_backbone", type=str2bool, default=True, help="Whether or not we are using the extended swin_small_transformer backbone. Only applicable if '--use_per_pixel_baseline'=False. Default: True")
-parser.add_argument("--use_per_pixel_baseline", type=str2bool, default=False, help="Whether or not we are using the per_pixel_calculating head. Alternative is the MaskFormer (or transformer) heads. Default: False")
+parser.add_argument("--use_transformer_backbone", type=str2bool, default=False, help="Whether or not we are using the extended swin_small_transformer backbone. Only applicable if '--use_per_pixel_baseline'=False. Default: True")
+parser.add_argument("--use_per_pixel_baseline", type=str2bool, default=True, help="Whether or not we are using the per_pixel_calculating head. Alternative is the MaskFormer (or transformer) heads. Default: False")
 parser.add_argument("--debugging", type=str2bool, default=False, help="Whether or not we are debugging the script. Default: False")
 # Parse the arguments into a Namespace variable
 FLAGS = parser.parse_args()

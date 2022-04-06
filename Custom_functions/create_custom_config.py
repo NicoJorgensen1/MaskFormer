@@ -38,12 +38,12 @@ def createVitrolifeConfiguration(FLAGS):
             checkpoint_file = [x for x in os.listdir(checkpoint_dir) if all([swin_type in x, x.endswith(".pkl")])][-1]  # Find the checkpoint file for the chosen swin transformer
             cfg.MODEL.WEIGHTS = os.path.join(checkpoint_dir, checkpoint_file)               # Load the swin_transformer checkpoint
     elif FLAGS.use_transformer_backbone==False and FLAGS.use_per_pixel_baseline==False:     # Else-if the user will use regular ResNet backbone ...
-        cfg.merge_from_file(os.path.join(config_folder, "maskformer_R"+"{:d}".format(FLAGS.resnet_depth)+"_bs16_160k.yaml"))  # ... merge with the ResNet_maskformer config
+        cfg.merge_from_file(os.path.join(config_folder, "maskformer_R"+"{:d}".format(FLAGS.resnet_depth)+"_bs16_160k.yaml"))    # ... merge with the resnet config
         cfg.MODEL.RESNETS.DEPTH = FLAGS.resnet_depth                                        # Assign the depth of the ResNet backbone feature extracting model
         if FLAGS.use_checkpoint==True:                                                      # If the user choose to start training from a earlier checkpoint ...
             cfg.MODEL.WEIGHTS = os.path.join(checkpoint_dir, "maskformer_resnet_backbone_checkpoint.pkl")   # Load the resnet_backbone checkpoint
     elif FLAGS.use_per_pixel_baseline==True:                                                # Otherwise, then the user chose to work with the per_pixel_calculating baselines, so ...
-        cfg.merge_from_file(os.path.join(config_folder, "per_pixel_baseline_R"+"{:d}".format(FLAGS.resnet_depth)+"_bs16_160k.yaml"))  # ... merge with the per_pixel_baseline config
+        cfg.merge_from_file(os.path.join(config_folder, "per_pixel_baseline_R"+"{:d}".format(50)+"_bs16_160k.yaml"))    # ... only R50 per-pixel baseline config is available 
         if FLAGS.use_checkpoint==True:                                                      # If the user choose to start training from a earlier checkpoint ...
             cfg.MODEL.WEIGHTS = os.path.join(checkpoint_dir, "maskformer_per_pixel_baseline_checkpoint.pkl")    # Load the per_pixel classification checkpoint
     cfg.merge_from_file(os.path.join(config_folder, "Base-ADE20K-150.yaml"))                # Merge with the base config for ade20K dataset. This is the config selecting that we use the ADE20K dataset
@@ -78,6 +78,8 @@ def changeConfig_withFLAGS(cfg, FLAGS):
     cfg.MODEL.MASK_FORMER.TEST.OVERLAP_THRESHOLD = float(0.025)                             # The threshold for overlapping masks
     cfg.MODEL.MASK_FORMER.TEST.PANOPTIC_ON = False                                          # Disable the panoptic head for the maskformer 
     cfg.MODEL.MASK_FORMER.NUM_OBJECT_QUERIES = FLAGS.num_queries                            # The number of queries to detect from the Transformer module 
+    cfg.MODEL.BACKBONE.FREEZE_AT = FLAGS.backbone_freeze_layers                             # The number of backbone layers to freeze of the backbone 
+    cfg.MODEL.RESNETS.DEPTH = FLAGS.resnet_depth                                            # The number of layers in the ResNet backbone 
     cfg.MODEL.SEM_SEG_HEAD.LOSS_WEIGHT = 2                                                  # Increase loss weight for the sem_seg_head
     cfg.TEST.EVAL_PERIOD = 0                                                                # We won't use the build in evaluation, only the custom evaluation function
     cfg.SOLVER.CHECKPOINT_PERIOD = FLAGS.epoch_iter                                         # Save a new model checkpoint after each epoch, i.e. after everytime the entire trainining set has been seen by the model
@@ -96,7 +98,6 @@ def changeConfig_withFLAGS(cfg, FLAGS):
         cfg.MODEL.PIXEL_STD = [57.32, 59.69, 61.93]                                         # Write the correct image standard deviation value for the entire vitrolife dataset
         cfg.SOLVER.STEPS = []                                                               # <<< Deprecated input argument: Use --patience instead >>>
         cfg.SOLVER.GAMMA = 1                                                                # After every "step" iterations the learning rate will be updated, as new_lr = old_lr*gamma
-        cfg.SOLVER.STEPS = []                                                               # We use no learning rate steps in the config here - those are given later 
     if FLAGS.debugging==True:                                                               # If we are debugging the model ...
         cfg.SOLVER.WEIGHT_DECAY = float(0)                                                  # ... we don't want any weight decay
         cfg.MODEL.MASK_FORMER.DROPOUT = float(0)                                            # ... we don't wany any dropout
