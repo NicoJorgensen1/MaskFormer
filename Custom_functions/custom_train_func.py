@@ -125,8 +125,8 @@ def objective_train_func(trial, FLAGS, cfg, logs, data_batches=None, hyperparame
     eval_train_results = {"sem_seg": []}                                                                    # Set the training evaluation results as an empty dictionary 
     train_pq_results = {}                                                                                   # Set training PQ results to be an empty dictionary
     conf_matrix_train, conf_matrix_val, conf_matrix_test = None, None, None                                 # Initialize the confusion matrixes as None values 
-    train_dataset = cfg.DATASETS.TRAIN[0]                                                                   # Get the training dataset name
-    val_dataset = cfg.DATASETS.TEST[0]                                                                      # Get the validation dataset name
+    train_dataset = cfg.DATASETS.TRAIN                                                                      # Get the training dataset name
+    val_dataset = cfg.DATASETS.TEST                                                                         # Get the validation dataset name
     lr_update_check = np.zeros((FLAGS.patience, 1), dtype=bool)                                             # Preallocating array to determine whether or not the learning rate was updated
     quit_training = False                                                                                   # Boolean value determining whether or not to commit early stopping
     epochs_to_run = 1 if hyperparameter_optimization else FLAGS.num_epochs                                  # We'll run only 1 epoch if we are performing HPO
