@@ -79,7 +79,7 @@ class My_GoTo_Trainer(DefaultTrainer):
             start_val = learn_rates[current_epoch-1]                                                            # ... and then choose the starting learning rate as the lower one
             end_val = learn_rates[current_epoch]                                                                # ... and then choose the next learning rate as the higher one
         elif warm_ups < current_epoch:                                                                          # Instead if we are in the regular training period ...
-            start_val, end_val = float(1), float(0.75)                                                          # Then the learning rate will be cyclical between '--learning_rate' and '0.5 * --learning_rate'
+            start_val, end_val = float(1), float(0.50)                                                          # Then the learning rate will be cyclical between '--learning_rate' and '0.5 * --learning_rate'
         if "train" not in cfg.DATASETS.TRAIN[0]: start_val, end_val = 0, 0                                      # If we are using the validation or test set, then learning rates are set to 0
         
         sched = CosineParamScheduler2(start_value=start_val, end_value=end_val)

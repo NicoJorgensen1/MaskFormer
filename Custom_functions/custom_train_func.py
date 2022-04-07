@@ -31,7 +31,7 @@ def run_train_func(cfg, run_mode):
 # Function to launch the training
 def launch_custom_training(FLAGS, config, dataset, epoch=0, run_mode="train", hyperparameter_opt=False):
     FLAGS.epoch_iter = int(np.floor(np.divide(FLAGS.num_train_files, FLAGS.batch_size)))                    # Compute the number of iterations per training epoch with the given batch size
-    config.SOLVER.MAX_ITER = FLAGS.epoch_iter * (5 if all(["train" in run_mode, epoch>0, "vitrolife" in FLAGS.dataset_name.lower()]) else 2)    # Increase training iteration count for precise BN computations
+    config.SOLVER.MAX_ITER = FLAGS.epoch_iter * (5 if all(["train" in run_mode, hyperparameter_opt=False, "vitrolife" in FLAGS.dataset_name.lower()]) else 1)   # Increase training iteration count for precise BN computations
     if all(["train" in run_mode, hyperparameter_opt==True]):
         if "vitrolife" in FLAGS.dataset_name.lower(): config.SOLVER.MAX_ITER = int(FLAGS.epoch_iter * (1.50 if FLAGS.use_per_pixel_baseline else 3))    # ... Transformer and ResNet backbones need a ...
         elif "ade20k" in FLAGS.dataset_name.lower(): config.SOLVER.MAX_ITER = int(FLAGS.epoch_iter * (1 if FLAGS.use_per_pixel_baseline else 2)/20)     # ... little more data to do well while searching...
@@ -61,7 +61,7 @@ def get_HPO_params(config, FLAGS, trial, hpt_opt=False):
     # If we are performing hyperparameter optimization, the config should be updated
     if all([hpt_opt==True, trial is not None, FLAGS.hp_optim==True]):
         lr = trial.suggest_float(name="learning_rate", low=1e-6, high=5e-3)
-        batch_size = trial.suggest_int(name="batch_size", low=1, high=1 if "nico" in os.getenv("DETECTRON2_DATASETS").lower() else int(np.ceil(np.min(FLAGS.available_mem_info)/1000)))
+        batch_size = trial.suggest_int(name="batch_size", low=1, high=1 if "nico" in os.getenv("DETECTRON2_DATASETS").lower() else int(np.ceil(np.min(FLAGS.available_mem_info)/1500)))
         optimizer_used = trial.suggest_categorical(name="optimizer_used", choices=["ADAMW", "SGD"])
         weight_decay = trial.suggest_float(name="weight_decay", low=1e-8, high=2e-2)
         dice_loss_weight = trial.suggest_int(name="dice_loss_weight", low=2, high=25)
