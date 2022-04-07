@@ -131,6 +131,7 @@ def pq_evaluation(args, config, data_split="train", hp_optim=False):
 
     image_ids = list(imgToAnns.keys())
     total_runs = len(image_ids) if all(["train" not in data_split, hp_optim==False]) else 10                    # If we are performing hyperparameter optimization, only 10 train samples will be evaluated
+    if "ade20k" in args.dataset_name.lower() and hp_optim: total_runs = int(np.divide(total_runs, 4))           # If we are on the ADE20k dataset, then only 1/4 of the dataset will be evaluated during HPO
     image_ids = image_ids[:total_runs]
 
     meta = MetadataCatalog.get(args.dataset_name)
