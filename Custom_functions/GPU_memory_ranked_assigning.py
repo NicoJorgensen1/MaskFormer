@@ -18,7 +18,7 @@ def assign_free_gpus(max_gpus=1):
         max_gpus = len(available_mem_info)
     gpus_to_use_int = np.sort(np.flip(np.argsort(available_mem_info))[:max_gpus])
     gpus_to_use_string = ",".join([str(x) for x in gpus_to_use_int])
-    os.environ['CUDA_VISIBLE_DEVICES'] = 0#gpus_to_use_string
+    os.environ['CUDA_VISIBLE_DEVICES'] = "0"#gpus_to_use_string
     available_mem_string_list = ["{:d}MB".format(x) for x in available_mem_info[gpus_to_use_int]]
     if len(available_mem_string_list) == 1: available_mem_string_list = available_mem_string_list[-1]
     if gpus_to_use_string: gpus_to_use_string = "Using GPU{:s}: {} with {} available memory".format("s" if len(gpus_to_use_string)>1 else "", gpus_to_use_string, available_mem_string_list)
