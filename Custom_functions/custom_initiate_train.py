@@ -59,7 +59,7 @@ if FLAGS.inference_only==False:
     printAndLog(input_to_write="Best validation results:".ljust(30)+"Epoch {:d}: {:s} = {:.3f}\n{:s}".
         format(best_epoch, FLAGS.eval_metric, new_best, "All best validation results:".upper().ljust(30)), logs=log_file)
     printAndLog(input_to_write=getBestEpochResults(history, best_epoch), logs=log_file, prefix="", length=15)
-if "test" in cfg.DATASETS.TEST[0]:
+if "vitrolife" in FLAGS.dataset_name.lower():                                                       # As only the Vitrolife dataset includes a test set...
     printAndLog(input_to_write="All test results:".upper().ljust(30), logs=log_file)
     printAndLog(input_to_write=test_history, logs=log_file, prefix="", length=15)
 

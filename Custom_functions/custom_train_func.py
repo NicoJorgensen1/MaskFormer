@@ -34,8 +34,10 @@ def launch_custom_training(FLAGS, config, dataset, epoch=0, run_mode="train", hy
     config.SOLVER.MAX_ITER = FLAGS.epoch_iter * (5 if all(["train" in run_mode, hyperparameter_opt==False, "vitrolife" in FLAGS.dataset_name.lower()]) else 1)  # Increase training iteration count for precise BN computations
     if all(["train" in run_mode, hyperparameter_opt==True]):
         if "vitrolife" in FLAGS.dataset_name.lower(): config.SOLVER.MAX_ITER = int(FLAGS.epoch_iter * (1.50 if FLAGS.use_per_pixel_baseline else 3))    # ... Transformer and ResNet backbones need a ...
-        elif "ade20k" in FLAGS.dataset_name.lower(): config.SOLVER.MAX_ITER = int(FLAGS.epoch_iter * (1 if FLAGS.use_per_pixel_baseline else 2)/20)     # ... little more data to do well while searching...
-    if "val" in run_mode and "ade20k" in FLAGS.dataset_name.lower(): config.SOLVER.MAX_ITER = int(np.ceil(np.divide(FLAGS.epoch_iter, 4)))
+        elif "ade20k" in FLAGS.dataset_name.lower(): config.SOLVER.MAX_ITER = int(FLAGS.epoch_iter * (1 if FLAGS.use_per_pixel_baseline else 2)/3)      # ... little more data to do well while searching...
+    if all(["val" in run_mode, "ade20k" in FLAGS.dataset_name.lower()]):                                    # If we are validating the ADE20K dataset ...
+        config.SOLVER.IMS_PER_BATCH = 1                                                                     # ... the batch size will be set to 1 ...
+        config.SOLVER.MAX_ITER = int(np.ceil(np.divide(FLAGS.num_val_files, 5)))                            # ... and only 1/5 of the val_dataset will be used
     config.SOLVER.CHECKPOINT_PERIOD = config.SOLVER.MAX_ITER                                                # Save a new model checkpoint after each epoch
     if "train" in run_mode and hyperparameter_opt==False:                                                   # If we are training ... 
         for idx, item in enumerate(config.custom_key[::-1]):                                                # Iterate over the custom keys in reversed order
@@ -178,13 +180,13 @@ def objective_train_func(trial, FLAGS, cfg, logs, data_batches=None, hyperparame
             printAndLog(input_to_write=error_string, logs=logs, prefix="", postfix="\n")
 
     # Evaluation on the vitrolife test dataset. There is no ADE20K-test dataset.
+    test_history = {}                                                                                       # Initialize the test_history dictionary as an empty dictionary
     if all([FLAGS.debugging == False, "vitrolife" in FLAGS.dataset_name.lower(), hyperparameter_optimization==False]):  # Inference will only be performed when training the Vitrolife model
         config.DATASETS.TEST = ("vitrolife_dataset_test",)                                                  # The inference will be done on the test dataset
         eval_test_results,_,_,conf_matrix_test = evaluateResults(FLAGS, config, data_split="test")          # Evaluate the result metrics on the validation set with the best performing model
         _ = plot_confusion_matrix(config=config, conf_train=conf_matrix_train, conf_val=conf_matrix_val, conf_test=conf_matrix_test, done_training=True)
         test_pq_results = pq_evaluation(args=FLAGS, config=config, data_split="test")                       # Evaluate the Panoptic Quality for the test semantic segmentation results
         history_test = combineDataToHistoryDictionaryFunc(config=config, eval_metrics=eval_test_results["sem_seg"], pq_metrics=test_pq_results, data_split="test")
-        test_history = {}                                                                                   # Initialize the test_history dictionary as an empty dictionary
         for key in history_test.keys():                                                                     # Iterate over all the keys in the history dictionary
             if "test" in key: test_history[key] = history_test[key][-1]                                     # If "test" is in the key, assign the value to the test_dictionary 
 
