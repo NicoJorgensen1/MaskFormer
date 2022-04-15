@@ -39,7 +39,7 @@ def load_json_metrics(config, data_split="train"):
         key_val, mov_avg_val = list(), list()                                                           # Initiate lists to store the actual values and the moving-average computed values
         for item in metrics[key]:                                                                       # Loop through each item in the dict[key]->value list
             key_val.append(item)                                                                        # Append the actual item value to the key_val list
-            mov_avg_val.append(mov_avg_array(inp_array=key_val, mov_of_last_n_elements=25, output_last_n_elements=1).item())    # Compute the next mov_avg val for the last 10 elements
+            mov_avg_val.append(mov_avg_array(inp_array=key_val, mov_of_last_n_elements=50, output_last_n_elements=1).item())    # Compute the next mov_avg val for the last 50 elements
         metrics[key] = mov_avg_val                                                                      # Assign the newly computed moving average of the dict[key]->values to the dictionary
     return metrics                                                                                      # Return the moving average value dictionary
 # metrics = load_json_metrics(config=config)

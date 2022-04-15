@@ -68,16 +68,19 @@ def str2bool(v):
 # Alter the FLAGS input arguments
 def changeFLAGS(FLAGS):
     if FLAGS.num_gpus != FLAGS.gpus_used: FLAGS.num_gpus = FLAGS.gpus_used  # As there are two input arguments where the number of GPUs can be assigned, the gpus_used argument is superior
-    if "vitrolife" in FLAGS.dataset_name.lower() : FLAGS.num_gpus = 1       # Working with the Vitrolife dataset can only be done using a single GPU for some weird reason...
+    if "vitro" in FLAGS.dataset_name.lower():                               # Working with the Vitrolife dataset ...
+        FLAGS.num_gpus = 1                                                  # ... can only be done using a single GPU for some weird reason...
+        FLAGS.dataset_name = "vitrolife"                                    # ... setting the correct vitrolife dataset name
+    if "ade" in FLAGS.dataset_name.lower(): FLAGS.dataset_name = "ade20k"   # If working with ade20k, then the dataset name must match. Set it here to assure it is always the same, no matter the user input 
     if FLAGS.eval_only != FLAGS.inference_only: FLAGS.eval_only = FLAGS.inference_only  # As there are two inputs where "eval_only" can be set, inference_only is the superior
     if FLAGS.min_delta < 1.0: FLAGS.min_delta *= 100                        # As the model outputs metrics multiplied by a factor of 100, the min_delta value must also be scaled accordingly
     if FLAGS.debugging: FLAGS.eval_metric.replace("val", "train")           # The metric used for evaluation will be a training metric, if we are debugging the model
     if FLAGS.use_per_pixel_baseline: FLAGS.resnet_depth = 50                # The per-pixel baseline can only be used with a ResNet depth of 50 
     if FLAGS.inference_only: FLAGS.num_epochs = 1                           # If we are only using inference, then we'll only run through one epoch
-    FLAGS.num_queries = 100 if "ade20k" in FLAGS.dataset_name.lower() else 25   # The number of queries will be set to 100 with the ADE20K dataset and 25 with the Vitrolife dataset
+    FLAGS.num_queries = 100 if FLAGS.dataset_name=="ade20k" else 25         # The number of queries will be set to 100 with the ADE20K dataset and 25 with the Vitrolife dataset
     FLAGS.HPO_current_trial = 0                                             # A counter for the number of trials of hyperparameter optimization performed 
     FLAGS.epoch_num = 0                                                     # A counter iterating over the number of epochs 
-    FLAGS.HPO_best_metric = np.inf if "loss" in FLAGS.eval_metric else -np.inf  # Create variable to keep track of the best results obtained when performing HPO
+    FLAGS.HPO_best_metric = np.inf if "loss" in FLAGS.eval_metric.lower() else -np.inf  # Create variable to keep track of the best results obtained when performing HPO
     FLAGS.quit_training = False                                             # The initial value for the "quit_training" parameter should be False
     FLAGS.ignore_label = 0 if FLAGS.ignore_background else 255              # As default no labels will be ignored 
     return FLAGS
@@ -108,7 +111,7 @@ def write_config_to_file(config):
 # Running the parser function. By doing it like this the FLAGS will get out of the main function
 parser = default_argument_parser()
 start_time = datetime.now().strftime("%H_%M_%d%b%Y").upper()
-parser.add_argument("--dataset_name", type=str, default="ade20k", help="Which datasets to train on. Choose between [ADE20K, Vitrolife]. Default: Vitrolife")
+parser.add_argument("--dataset_name", type=str, default="vitrolife", help="Which datasets to train on. Choose between [ADE20K, Vitrolife]. Default: Vitrolife")
 parser.add_argument("--output_dir_postfix", type=str, default=start_time, help="Filename extension to add to the output directory of the current process. Default: now: 'HH_MM_DDMMMYYYY'")
 parser.add_argument("--eval_metric", type=str, default="val_mIoU", help="Metric to use in order to determine the 'best' model weights. Available: val_/train_ prefix to [total_loss, mIoU, fwIoU, mACC, PQ, RQ, SQ]. Default: val_fwIoU")
 parser.add_argument("--optimizer_used", type=str, default="ADAMW", help="Optimizer to use. Available [SGD, ADAMW]. Default: ADAMW")
@@ -120,11 +123,11 @@ parser.add_argument("--resnet_depth", type=int, default=101, help="The depth of 
 parser.add_argument("--batch_size", type=int, default=1, help="The batch size used for training the model. Default: 1")
 parser.add_argument("--num_images", type=int, default=6, help="The number of images to display/segment. Default: 6")
 parser.add_argument("--num_trials", type=int, default=1000, help="The number of trials to run HPO for. Only relevant if '--hp_optim==True'. Default: 300")
-parser.add_argument("--num_random_trials", type=int, default=50, help="The number of random trials to run initiate the HPO for. Only relevant if '--hp_optim==True'. Default: 30")
+parser.add_argument("--num_random_trials", type=int, default=100, help="The number of random trials to run initiate the HPO for. Only relevant if '--hp_optim==True'. Default: 30")
 parser.add_argument("--display_rate", type=int, default=5, help="The epoch_rate of how often to display image segmentations. A display_rate of 3 means that every third epoch, visual segmentations are saved. Default: 5")
 parser.add_argument("--gpus_used", type=int, default=1, help="The number of GPU's to use for training. Only applicable for training with ADE20K. This input argument deprecates the '--num-gpus' argument. Default: 1")
-parser.add_argument("--num_epochs", type=int, default=150, help="The number of epochs to train the model for. Default: 1")
-parser.add_argument("--warm_up_epochs", type=int, default=3, help="The number of epochs to warm up the learning rate when training. Will go from 1/100 '--learning_rate' to '--learning_rate' during these warm_up_epochs. Default: 3")
+parser.add_argument("--num_epochs", type=int, default=75, help="The number of epochs to train the model for. Default: 1")
+parser.add_argument("--warm_up_epochs", type=int, default=5, help="The number of epochs to warm up the learning rate when training. Will go from 1/100 '--learning_rate' to '--learning_rate' during these warm_up_epochs. Default: 3")
 parser.add_argument("--patience", type=int, default=5, help="The number of epochs to accept that the model hasn't improved before lowering the learning rate by a factor '--lr_gamma'. Default: 5")
 parser.add_argument("--early_stop_patience", type=int, default=13, help="The number of epochs to accept that the model hasn't improved before terminating training. Default: 12")
 parser.add_argument("--backbone_freeze_layers", type=int, default=0, help="The number of layers in the backbone to freeze when training. Available [0,1,2,3,4,5]. Default: 0")
