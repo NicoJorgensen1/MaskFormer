@@ -56,7 +56,7 @@ def evaluateResults(FLAGS, cfg, data_split="train",  dataloader=None, evaluator=
     # Create a progress bar to keep track on the evaluation
     with tqdm(total=total_runs, iterable=None, postfix="Evaluating the {:s} dataset".format(data_split), unit="img",  
             file=sys.stdout, desc="Image {:d}/{:d}".format(1, total_runs), colour="green", leave=True, ascii=True, 
-            bar_format="{desc}  | {percentage:3.0f}% | {bar:35}| {n_fmt}/{total_fmt} | [Spent: {elapsed}. Remaining: {remaining} | {postfix}]") as tepoch:     
+            bar_format="{desc}  | {percentage:3.0f}% | {bar:35}| {n_fmt}/{total_fmt} | [Spent: {elapsed}. Remaining: {remaining} | {postfix}]") as tepoch:
         
         # Predict all the files in the dataset
         for kk, data_batch in enumerate(dataloader):                                                        # Iterate through all batches in the dataloader

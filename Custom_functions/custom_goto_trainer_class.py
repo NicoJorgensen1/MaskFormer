@@ -23,14 +23,14 @@ def custom_augmentation_mapper(config, is_train=True):
     else:
         transform_list = [                                                  # Initiate the list of image data augmentations to use
             T.Resize((500,500), Image.BILINEAR),                            # https://detectron2.readthedocs.io/en/latest/modules/data_transforms.html#detectron2.data.transforms.Resize
-            T.RandomBrightness(0.8, 1.5),                                   # https://detectron2.readthedocs.io/en/latest/modules/data_transforms.html#detectron2.data.transforms.RandomBrightness
+            T.RandomBrightness(0.8, 1.3),                                   # https://detectron2.readthedocs.io/en/latest/modules/data_transforms.html#detectron2.data.transforms.RandomBrightness
             T.RandomLighting(0.7),                                          # https://detectron2.readthedocs.io/en/latest/modules/data_transforms.html#detectron2.data.transforms.RandomLighting
             T.RandomContrast(0.7, 1.3),                                     # https://detectron2.readthedocs.io/en/latest/modules/data_transforms.html#detectron2.data.transforms.RandomContrast
             T.RandomSaturation(0.85, 1.15),                                 # https://detectron2.readthedocs.io/en/latest/modules/data_transforms.html#detectron2.data.transforms.RandomSaturation
             T.RandomRotation(angle=[-45, 45]),                              # https://detectron2.readthedocs.io/en/latest/modules/data_transforms.html#detectron2.data.transforms.RandomRotation
             T.RandomFlip(prob=0.25, horizontal=True, vertical=False),       # https://detectron2.readthedocs.io/en/latest/modules/data_transforms.html#detectron2.data.transforms.RandomLighting 
             T.RandomFlip(prob=0.25, horizontal=False, vertical=True),       # https://detectron2.readthedocs.io/en/latest/modules/data_transforms.html#detectron2.data.transforms.RandomLighting  
-            T.RandomCrop("relative", (0.75, 0.75)),                         # https://detectron2.readthedocs.io/en/latest/modules/data_transforms.html#detectron2.data.transforms.RandomCrop
+            T.RandomCrop("relative", (0.80, 0.80)),                         # https://detectron2.readthedocs.io/en/latest/modules/data_transforms.html#detectron2.data.transforms.RandomCrop
             T.Resize((500,500), Image.BILINEAR)]                            # https://detectron2.readthedocs.io/en/latest/modules/data_transforms.html#detectron2.data.transforms.Resize
     custom_mapper = MaskFormerSemanticDatasetMapper(config, is_train=is_train, augmentations=transform_list)    # Create the mapping from data dictionary to augmented training image
     return custom_mapper
@@ -177,7 +177,7 @@ class My_GoTo_Trainer(DefaultTrainer):
         dataset_used = cfg.DATASETS.TRAIN[0]                                        # Get the current dataset
         if "val" in dataset_used: cfg.TEST.PRECISE_BN.ENABLED = False               # If we are in validation, precise_bn is disabled
         num_files = MetadataCatalog[dataset_used].num_files_in_dataset              # Read the number of files of the used dataset
-        precise_bn_period = int(num_files/2) if num_files < 51 else 25              # Every 25 iteration the PreciseBN will be calculated
+        precise_bn_period = int(num_files/2) if num_files < 51 else 32              # Every 32 iteration the PreciseBN will be calculated
 
 
         ret = [

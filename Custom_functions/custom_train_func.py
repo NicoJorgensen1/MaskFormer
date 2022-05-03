@@ -33,8 +33,8 @@ def launch_custom_training(FLAGS, config, dataset, epoch=0, run_mode="train", hy
     FLAGS.epoch_iter = int(np.floor(np.divide(FLAGS.num_train_files, FLAGS.batch_size)))                    # Compute the number of iterations per training epoch with the given batch size
     config.SOLVER.MAX_ITER = FLAGS.epoch_iter * (7 if all(["train" in run_mode, hyperparameter_opt==False, "vitrolife" in FLAGS.dataset_name.lower()]) else 1)  # Increase training iteration count for precise BN computations
     if all(["train" in run_mode, hyperparameter_opt==True]):
-        if "vitrolife" in FLAGS.dataset_name.lower(): config.SOLVER.MAX_ITER = int(FLAGS.epoch_iter * (1 if FLAGS.use_per_pixel_baseline else 2))   # ... Transformer and ResNet backbones need a ...
-        elif "ade20k" in FLAGS.dataset_name.lower(): config.SOLVER.MAX_ITER = int(FLAGS.epoch_iter * (1 if FLAGS.use_per_pixel_baseline else 2)/4)  # ... little more data to do well while searching...
+        if "vitrolife" in FLAGS.dataset_name.lower(): config.SOLVER.MAX_ITER = int(FLAGS.epoch_iter * (1 if FLAGS.use_per_pixel_baseline else 1.5)) # ... Transformer and ResNet backbones need a ...
+        elif "ade20k" in FLAGS.dataset_name.lower(): config.SOLVER.MAX_ITER = int(FLAGS.epoch_iter * (1 if FLAGS.use_per_pixel_baseline else 2)/6)  # ... little more data to do well while searching...
     if "val" in run_mode and "ade20k" in FLAGS.dataset_name.lower(): config.SOLVER.MAX_ITER = int(np.ceil(np.divide(FLAGS.epoch_iter, 4)))
     config.SOLVER.CHECKPOINT_PERIOD = config.SOLVER.MAX_ITER                                                # Save a new model checkpoint after each epoch
     if "train" in run_mode and hyperparameter_opt==False:                                                   # If we are training ... 
@@ -60,36 +60,22 @@ def launch_custom_training(FLAGS, config, dataset, epoch=0, run_mode="train", hy
 def get_HPO_params(config, FLAGS, trial, hpt_opt=False):
     # If we are performing hyperparameter optimization, the config should be updated
     if all([hpt_opt==True, trial is not None, FLAGS.hp_optim==True]):
-        lr = trial.suggest_float(name="learning_rate", low=1e-6, high=5e-3)
-        batch_size = trial.suggest_int(name="batch_size", low=1, high=1 if "nico" in os.getenv("DETECTRON2_DATASETS").lower() else int(np.ceil(np.min(FLAGS.available_mem_info)/1500)))
-        optimizer_used = trial.suggest_categorical(name="optimizer_used", choices=["ADAMW", "SGD"])
-        weight_decay = trial.suggest_float(name="weight_decay", low=1e-8, high=2e-2)
-        dice_loss_weight = trial.suggest_int(name="dice_loss_weight", low=2, high=25)
-        mask_loss_weight = trial.suggest_int(name="mask_loss_weight", low=2, high=25)
-        dropout = trial.suggest_float(name="dropout", low=1e-8, high=0.5)
-        backbone_multiplier = trial.suggest_float("backbone_multiplier", low=1e-6, high=0.5)
-
-        if "vitrolife" in FLAGS.dataset_name.lower():
-            use_checkpoint = trial.suggest_categorical(name="use_checkpoint", choices=["True", "False"])
-
         # Change the FLAGS parameters and then change the config
-        FLAGS.learning_rate = lr
-        FLAGS.batch_size = batch_size
-        FLAGS.optimizer_used = optimizer_used
-        FLAGS.weight_decay = weight_decay
-        FLAGS.backbone_multiplier = backbone_multiplier 
-        FLAGS.dice_loss_weight = dice_loss_weight
-        FLAGS.mask_loss_weight = mask_loss_weight
-        FLAGS.dropout = dropout
+        FLAGS.learning_rate = trial.suggest_float(name="learning_rate", low=1e-6, high=5e-3)
+        FLAGS.batch_size = trial.suggest_int(name="batch_size", low=1, high=1 if "nico" in os.getenv("DETECTRON2_DATASETS").lower() else int(np.ceil(np.min(FLAGS.available_mem_info)/1500)))
+        FLAGS.optimizer_used = trial.suggest_categorical(name="optimizer_used", choices=["ADAMW", "SGD"])
+        FLAGS.weight_decay = trial.suggest_float(name="weight_decay", low=1e-8, high=2e-2)
+        FLAGS.backbone_multiplier = trial.suggest_float("backbone_multiplier", low=1e-6, high=0.5) 
+        FLAGS.dice_loss_weight = trial.suggest_int(name="dice_loss_weight", low=2, high=25)
+        FLAGS.mask_loss_weight = trial.suggest_int(name="mask_loss_weight", low=2, high=25)
+        FLAGS.dropout = trial.suggest_float(name="dropout", low=1e-8, high=0.5)
         if "vitrolife" in FLAGS.dataset_name:
-            num_queries = trial.suggest_int(name="num_queries", low=15, high=150) 
-            FLAGS.num_queries = num_queries
-            FLAGS.use_checkpoint = bool(use_checkpoint)
+            FLAGS.num_queries = trial.suggest_int(name="num_queries", low=15, high=150) 
+            FLAGS.use_checkpoint = bool(trial.suggest_categorical(name="use_checkpoint", choices=["True", "False"]))
         if FLAGS.use_transformer_backbone==False:
-            resnet_depth = trial.suggest_categorical(name="resnet_depth", choices=[50, 101])
-            backbone_freeze_layers = trial.suggest_int(name="backbone_freeze", low=0, high=5)
-            FLAGS.resnet_depth = resnet_depth
-            FLAGS.backbone_freeze_layers = backbone_freeze_layers
+            FLAGS.resnet_depth = trial.suggest_categorical(name="resnet_depth", choices=[50, 101])
+            FLAGS.backbone_freeze_layers = trial.suggest_int(name="backbone_freeze", low=0, high=5)
+        del config 
         config = createVitrolifeConfiguration(FLAGS=FLAGS)
         config = changeConfig_withFLAGS(cfg=config, FLAGS=FLAGS)
     elif all([hpt_opt==False, trial is not None, FLAGS.hp_optim==True]):
@@ -108,6 +94,7 @@ def get_HPO_params(config, FLAGS, trial, hpt_opt=False):
         if FLAGS.use_transformer_backbone==False:
             FLAGS.resnet_depth = trial.params["resnet_depth"]
             FLAGS.backbone_freeze_layers = trial.params["backbone_freeze"]
+        del config 
         config = createVitrolifeConfiguration(FLAGS=FLAGS)
         config = changeConfig_withFLAGS(cfg=config, FLAGS=FLAGS)
     else: config = deepcopy(config)
@@ -134,6 +121,7 @@ def objective_train_func(trial, FLAGS, cfg, logs, data_batches=None, hyperparame
     quit_training = False                                                                                   # Boolean value determining whether or not to commit early stopping
     epochs_to_run = 1 if hyperparameter_optimization else FLAGS.num_epochs                                  # We'll run only 1 epoch if we are performing HPO
     train_start_time = time()                                                                               # Now the training starts
+    epoch_next_display = FLAGS.display_rate - 1                                                             # The next epoch where the images must be visualized 
 
     # Change the FLAGS and config parameters and perform either hyperparameter optimization, use the best found parameters or simply just train
     config, FLAGS = get_HPO_params(config=cfg, FLAGS=FLAGS, trial=trial, hpt_opt=hyperparameter_optimization)
@@ -157,9 +145,6 @@ def objective_train_func(trial, FLAGS, cfg, logs, data_batches=None, hyperparame
                 metrics_eval=eval_val_results["sem_seg"], history=history, pq_train=train_pq_results, pq_val=val_pq_results)    # ... including all training and validation metrics
             SaveHistory(historyObject=history, save_folder=config.OUTPUT_DIR)                               # Save the history dictionary after each epoch
             [os.remove(os.path.join(config.OUTPUT_DIR, x)) for x in os.listdir(config.OUTPUT_DIR) if "events.out.tfevent" in x]
-            if np.mod(np.add(epoch,1), FLAGS.display_rate) == 0 and hyperparameter_optimization==False:     # Every 'display_rate' epochs, the model will segment the same images again ...
-                _,data_batches,config,FLAGS = visualize_the_images(config=config, FLAGS=FLAGS, data_batches=data_batches, epoch_num=epoch+1)  # ... segment and save visualizations
-                _ = plot_confusion_matrix(config=config, epoch=epoch+1, conf_train=conf_matrix_train, conf_val=conf_matrix_val)
             
             # Performing callbacks
             if FLAGS.inference_only==False and hyperparameter_optimization==False: 
@@ -169,9 +154,16 @@ def objective_train_func(trial, FLAGS, cfg, logs, data_batches=None, hyperparame
                     FLAGS.learning_rate = config.SOLVER.BASE_LR                                             # Update the FLAGS.learning_rate value
                 if epoch+1 >= FLAGS.early_stop_patience:                                                    # If the model has trained for more than 'early_stopping_patience' epochs ...
                     quit_training = early_stopping(history=history, FLAGS=FLAGS)                            # ... perform the early stopping callback
+            earlier_HPO_best = deepcopy(FLAGS.HPO_best_metric)                                              # Read the earlier best HPO value 
+            earlier_train_best = deepcopy(new_best)                                                         # Read the earlier best train value 
             new_best, best_epoch = updateLogsFunc(log_file=logs, FLAGS=FLAGS, history=history, best_val=new_best,
                     train_start=train_start_time, epoch_start=epoch_start_time, best_epoch=best_epoch,
                     cur_epoch=FLAGS.HPO_current_trial if hyperparameter_optimization else epoch)
+            HPO_visualize = True if all([new_best <= earlier_HPO_best, "loss" in FLAGS.eval_metric, new_best <= 20]) or all([new_best >= earlier_HPO_best, "loss" not in FLAGS.eval_metric, new_best >= 45]) else False
+            train_visualize = True if epoch==epoch_next_display or all([new_best <= earlier_train_best, "loss" in FLAGS.eval_metric, new_best <= 20]) or all([new_best >= earlier_train_best, "loss" not in FLAGS.eval_metric, new_best >= 45]) else False 
+            if all([train_visualize, hyperparameter_optimization==False]) or all([hyperparameter_optimization, HPO_visualize]): # At least every 'display_rate' epochs or if the model has improved ...
+                _,data_batches,config,FLAGS = visualize_the_images(config=config, FLAGS=FLAGS, data_batches=data_batches, epoch_num=epoch+1)    # ... the model will segment and save visualizations ...
+                _ = plot_confusion_matrix(config=config, epoch=epoch+1, conf_train=conf_matrix_train, conf_val=conf_matrix_val)                 # ... and display confusion matrixes 
             if quit_training == True:                                                                       # If the early stopping callback says we need to quit the training ...
                 printAndLog(input_to_write="Committing early stopping at epoch {:d}. The best {:s} is {:.3f} from epoch {:d}".format(epoch+1, FLAGS.eval_metric, new_best, best_epoch), logs=logs)
                 break                                                                                       # break the for loop and stop running more epochs
