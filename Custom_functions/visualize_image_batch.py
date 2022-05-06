@@ -4,6 +4,7 @@ import torch
 import torch.nn as nn
 import numpy as np
 import matplotlib
+import copy 
 matplotlib.use("pdf")
 from matplotlib import pyplot as plt
 from tqdm import tqdm                                                               # Used to set a progress bar
@@ -87,8 +88,9 @@ def create_batch_img_ytrue_ypred(config, data_split, FLAGS, data_batch=None, mod
         data_batch = next(iter(dataloader))                                         # Extract the next batch from the dataloader
     img_ytrue_ypred = {"input": list(), "y_pred": list(), "y_true": list(), "PN": list()}   # Initiate a dictionary to store the input images, ground truth masks and the predicted masks
     for data in data_batch:                                                         # Iterate over each data sample in the batch from the dataloader
-        img = torch.permute(data["image"], (1,2,0)).numpy()                         # Input image [H,W,C]
-        y_true = data["sem_seg"].numpy()                                            # Ground truth label mask [H,W]
+        img, y_pred, y_true = None, None, None                                      # Initiate the images as None variables before replacing them 
+        img = copy.deepcopy(torch.permute(data["image"], (1,2,0)).numpy())          # Input image [H,W,C]
+        y_true = copy.deepcopy(data["sem_seg"].numpy())                             # Ground truth label mask [H,W]
         y_true_col = apply_colormap(mask=y_true, config=config)                     # Ground truth color mask
         out = predictor.__call__(img)                                               # Predicted output dictionary. The call function needs images in BGR format.
         out_img = torch.permute(out["sem_seg"], (1,2,0))                            # Predicted output image [H,W,C]
@@ -121,11 +123,21 @@ def sort_dictionary_by_PN(data):
     return new_data
 
 
+# config = cfg
+# FLAGS = FLAGS
+# data_split = "train"
+# position=[0.55, 0.08, 0.40, 0.75]
+# epoch_num=None
+# data_batches=None
+# data_batch=None
+# model_done_training=False
+
 # Define function to plot the images
 def visualize_the_images(config, FLAGS, position=[0.55, 0.08, 0.40, 0.75], epoch_num=None, data_batches=None, model_done_training=False):
     # Get the datasplit and number of images to show
     fig_list, data_batches_final = list(), list()                                   # Initiate the list to store the figures in
-    if data_batches==None: data_batches = [None, None, None]                        # If no previous data has been sent, it must be a list of None's...
+    if data_batches==None:                                                          # If no previous data has been sent ...
+        data_batches = [None, None, None]                                           # ... it must be a list of None's...
     data_split_count = 1                                                            # Initiate the datasplit counter
     fontdict = {'fontsize': 25}                                                     # Set the font size for the plot
     for data_split, data_batch in tqdm(zip(["train", "val", "test"], data_batches), # Iterate through the three splits available
@@ -152,8 +164,9 @@ def visualize_the_images(config, FLAGS, position=[0.55, 0.08, 0.40, 0.75], epoch
                 else: plt.title("{:s}".format(key), fontdict=fontdict)              # Otherwise simply put the key, i.e. either input, y_pred or y_true.
                 plt.imshow(img, cmap="gray")                                        # Display the image
             row += 1                                                                # Increase the row counter by 1
-        try: fig = move_figure_position(fig=fig, position=position)                 # Try and move the figure to the wanted position (only possible on home computer with a display)
-        except: pass                                                                # Except, simply just let the figure retain the current position
+        if "nico" in config.OUTPUT_DIR.lower():
+            try: fig = move_figure_position(fig=fig, position=position)             # Try and move the figure to the wanted position (only possible on home computer with a display)
+            except: pass                                                            # Except, simply just let the figure retain the current position
         fig_name_init = "Segmented_{:s}_data_samples_from_".format(data_split)      # Initialize the figure name
         if epoch_num is not None: fig_name = "{:s}epoch_{:d}.jpg".format(fig_name_init, epoch_num)                      # If an epoch number has been specified, the figure name will contain that
         else: fig_name = "{:s}{:s}_training.jpg".format(fig_name_init, "after" if model_done_training else "before")    # Otherwise the visualization happens before/after training
