@@ -11,7 +11,7 @@ def circle_finder(mask_used, img=None):
     else:
         mask_gray = copy.deepcopy(mask)
     mask_blur = cv2.GaussianBlur(src=mask_gray.astype(float), ksize=(11,11), sigmaX=1, sigmaY=1).astype(np.uint8)
-    detected_circles = cv2.HoughCircles(mask_blur.astype(np.uint8), method=cv2.HOUGH_GRADIENT, dp=1, minDist=10, minRadius=10, maxRadius=35, param1=55, param2=20)
+    detected_circles = cv2.HoughCircles(mask_blur.astype(np.uint8), method=cv2.HOUGH_GRADIENT, dp=1, minDist=10, minRadius=10, maxRadius=35, param1=55, param2=10)
     num_circles = 0
     col = (0, 0, 255)
     if detected_circles is not None:
@@ -35,7 +35,7 @@ mask_used = cv2.imread(os.path.join(dataset_dir, mask_files[0]), cv2.IMREAD_COLO
 
 mask, num_circles = circle_finder(mask_used=mask_used, img=mask_used)
 
-cv2.imshow("Mask with open-cv circle finder", mask)
+cv2.imshow("Mask with open-cv circle finder", mask_used)
 cv2.waitKey(0)
 cv2.destroyAllWindows()
 

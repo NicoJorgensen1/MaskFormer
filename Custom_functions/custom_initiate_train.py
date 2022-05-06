@@ -23,8 +23,9 @@ assert os.path.isdir(dataset_dir), "The dataset directory doesn't exist in the c
 os.environ["DETECTRON2_DATASETS"] = dataset_dir
 
 # Import important libraries
+import numpy as np 
 from custom_callback_functions import keepAllButLatestAndBestModel                                  # Used for setting model weights on the config
-from custom_setup_func import printAndLog, getBestEpochResults, zip_output, write_config_to_file    # Log the results, get metrics from the best epoch, zip output directory and write config to file
+from custom_setup_func import printAndLog, getBestEpochResults, zip_output, write_config_to_file, SaveHistory   # Log the results, get metrics from the best epoch, zip output directory and write config to file
 from custom_train_func import objective_train_func                                                  # Function to launch the training with the given dataset
 from visualize_image_batch import visualize_the_images                                              # Functions visualize the image batch
 from custom_model_analysis_func import analyze_model_func                                           # Analyze the model FLOPS, number of parameters and activations computed
@@ -45,8 +46,8 @@ printAndLog(input_to_write=model_analysis, logs=log_file, oneline=False, length=
 fig_list_before, data_batches, cfg, FLAGS = visualize_the_images(config=cfg, FLAGS=FLAGS)           # Visualize some segmentations on random images before training
 
 # Train the model with the best found hyperparameters
-history, test_history, new_best, best_epoch, cfg = objective_train_func(trial=trial, FLAGS=FLAGS,   # Start the training with ...
-            cfg=cfg, logs=log_file, data_batches=data_batches, hyperparameter_optimization=False)   # ... the optimal hyper parameters
+history, test_history, new_best, best_epoch, cfg, PN_pred, PN_true = objective_train_func(trial=trial,  # Start the training with ...
+    FLAGS=FLAGS, cfg=cfg, logs=log_file, data_batches=data_batches, hyperparameter_optimization=False)  # ... the optimal hyper parameters
 
 # Visualize the same images, now after training
 cfg = keepAllButLatestAndBestModel(cfg=cfg, history=history, FLAGS=FLAGS, bestOrLatest="best")      # Put the model weights for the best performing model on the config
@@ -61,9 +62,15 @@ if FLAGS.inference_only==False:
     printAndLog(input_to_write=getBestEpochResults(history, best_epoch), logs=log_file, prefix="", length=15)
 if "vitrolife" in FLAGS.dataset_name.lower():                                                       # As only the Vitrolife dataset includes a test set...
     printAndLog(input_to_write="All test results:".upper().ljust(30), logs=log_file)
+    PN_accuracy = np.divide(np.sum(np.asarray(PN_pred) == np.asarray(PN_true)), len(PN_true))       # Compute the accuracy of computed PNs 
     printAndLog(input_to_write=test_history, logs=log_file, prefix="", length=15)
+    test_history["PN_pred"] = PN_pred                                                               # Assign the list of predicted PNs to the test history
+    test_history["PN_true"] = PN_true                                                               # Assign the list of true PNs to the test history 
+    printAndLog(input_to_write="The PN counts of the test dataset has an accuracy of {:.3f}".format(PN_accuracy), logs=log_file, postfix="\n")
+SaveHistory(historyObject=test_history, save_folder=cfg.OUTPUT_DIR, historyName="test_history")     # Save the test history to the output folder
 
 # Remove all metrics.json files, the default log-file and zip the resulting output directory
 [os.remove(os.path.join(cfg.OUTPUT_DIR, x)) for x in os.listdir(cfg.OUTPUT_DIR) if "metrics" in x.lower() and x.endswith(".json")]
 os.remove(os.path.join(cfg.OUTPUT_DIR, "log.txt"))
+
 zip_output(cfg)

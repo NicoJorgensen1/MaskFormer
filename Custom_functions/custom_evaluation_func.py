@@ -4,7 +4,7 @@ import os
 import torch
 import numpy as np
 from copy import deepcopy
-from detectron2.data import DatasetCatalog, DatasetMapper, build_detection_train_loader
+from detectron2.data import DatasetCatalog, MetadataCatalog, DatasetMapper, build_detection_train_loader
 from detectron2.evaluation import SemSegEvaluator
 from detectron2.engine.defaults import DefaultPredictor
 from tqdm import tqdm
@@ -37,6 +37,7 @@ def evaluateResults(FLAGS, cfg, data_split="train",  dataloader=None, evaluator=
     # Get the correct properties
     dataset_name = cfg.DATASETS.TRAIN[0] if "train" in data_split.lower() else cfg.DATASETS.TEST[0]         # Get the name of the dataset that will be evaluated
     total_runs = FLAGS.num_train_files if "train" in data_split.lower() else FLAGS.num_val_files            # Get the number of files 
+    meta_data = MetadataCatalog.get(dataset_name)
     if "train" in data_split and hp_optim==True: total_runs = 10                                            # If we are performing hyperparameter optimization, only 10 train samples will be evaluated
     if "ade20k" in FLAGS.dataset_name.lower() and hp_optim: total_runs = int(np.ceil(np.divide(total_runs, 4))) # If we are on the ADE20k dataset, then only 1/4 of the dataset will be evaluated during HPO
 
@@ -54,6 +55,7 @@ def evaluateResults(FLAGS, cfg, data_split="train",  dataloader=None, evaluator=
     evaluator.reset()                                                                                       # Reset the evaluator, i.e. remove all earlier computations and confusion matrixes
 
     # Create a progress bar to keep track on the evaluation
+    PN_count_pred, PN_count_true = list(), list()
     with tqdm(total=total_runs, iterable=None, postfix="Evaluating the {:s} dataset".format(data_split), unit="img",  
             file=sys.stdout, desc="Image {:d}/{:d}".format(1, total_runs), colour="green", leave=True, ascii=True, 
             bar_format="{desc}  | {percentage:3.0f}% | {bar:35}| {n_fmt}/{total_fmt} | [Spent: {elapsed}. Remaining: {remaining} | {postfix}]") as tepoch:
@@ -66,6 +68,12 @@ def evaluateResults(FLAGS, cfg, data_split="train",  dataloader=None, evaluator=
                 gt_mask.append(data["sem_seg"])                                                             # Get the ground truth corresponding to the current image
                 out_pred = predictor.__call__(img)                                                          # Make a prediction for the input image
                 outputs.append(out_pred)                                                                    # Append the current output to the list of outputs
+                if "vitrolife" in dataset_name.lower() and "test" in data_split.lower():                    # If we are working on the Vitrolife test dataset ... 
+                    out_img = torch.nn.functional.softmax(torch.permute(out_pred["sem_seg"], (1,2,0)), dim=-1)          # Get the softmax output of the predicted image
+                    out_pred_img = torch.argmax(out_img, dim=-1).cpu().numpy()                                          # Convert the predicted image into a numpy mask 
+                    PN_pred_area = np.sum(out_pred_img == np.where(np.in1d(meta_data.stuff_classes, "PN"))[0].item())   # Count the area of predicted PNs
+                    PN_count_pred.append(int(np.ceil(np.divide(PN_pred_area, FLAGS.PN_mean_pixel_area))))               # Compute the predicted number of PN's 
+                    PN_count_true.append(int(data["image_custom_info"]["PN_image"]))                                    # Get the true number of PN's 
             evaluator.process(data_batch, outputs, gt_mask)                                                 # Process the results by adding the results to the confusion matrix
             tepoch.desc = "Image {:d}/{:d} ".format(kk+1, total_runs)                                       # Update the description of the progress bar
             tepoch.update(1)                                                                                # Update the progress bar
@@ -75,5 +83,5 @@ def evaluateResults(FLAGS, cfg, data_split="train",  dataloader=None, evaluator=
     eval_metrics_results = evaluator.evaluate()                                                             # Compute the evaluation metrics, all IoU's and pixel accuracies
 
     # Return the results
-    return eval_metrics_results, dataloader, evaluator, evaluator._conf_matrix                              # Return the evaluation metrics, the dataloader, the evaluator and the confusion matrix
+    return eval_metrics_results, dataloader, evaluator, evaluator._conf_matrix, PN_count_pred, PN_count_true
 

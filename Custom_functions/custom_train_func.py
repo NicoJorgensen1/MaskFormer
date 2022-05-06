@@ -132,12 +132,12 @@ def objective_train_func(trial, FLAGS, cfg, logs, data_batches=None, hyperparame
             epoch_start_time = time()                                                                       # Now this new epoch starts
             if FLAGS.inference_only==False:
                 config = launch_custom_training(FLAGS=FLAGS, config=config, dataset=train_dataset, epoch=epoch, run_mode="train", hyperparameter_opt=hyperparameter_optimization)   # Launch the training loop for one epoch
-                eval_train_results, train_loader, train_evaluator, conf_matrix_train = evaluateResults(FLAGS, config, data_split="train", dataloader=train_loader, evaluator=train_evaluator, hp_optim=hyperparameter_optimization) # Evaluate the result on the training set
+                eval_train_results, train_loader, train_evaluator, conf_matrix_train, _, _ = evaluateResults(FLAGS, config, data_split="train", dataloader=train_loader, evaluator=train_evaluator, hp_optim=hyperparameter_optimization) # Evaluate the result on the training set
                 train_pq_results = pq_evaluation(args=FLAGS, config=config, data_split="train", hp_optim=hyperparameter_optimization)   # Evaluate the Panoptic Quality for the training semantic segmentation results  
             
             # Validation period. Will 'train' with lr=0 on validation data, correct the metrics files and evaluate performance on validation data
             config = launch_custom_training(FLAGS=FLAGS, config=config, dataset=val_dataset, epoch=epoch, run_mode="val", hyperparameter_opt=hyperparameter_optimization)   # Launch the training loop for one epoch
-            eval_val_results, val_loader, val_evaluator, conf_matrix_val = evaluateResults(FLAGS, config, data_split="val", dataloader=val_loader, evaluator=val_evaluator) # Evaluate the result metrics on the training set
+            eval_val_results, val_loader, val_evaluator, conf_matrix_val, _, _ = evaluateResults(FLAGS, config, data_split="val", dataloader=val_loader, evaluator=val_evaluator) # Evaluate the result metrics on the training set
             val_pq_results = pq_evaluation(args=FLAGS, config=config, data_split="val")                     # Evaluate the Panoptic Quality for the validation semantic segmentation results
             
             # Prepare for the training phase of the next epoch. Switch back to training dataset, save history and learning curves and visualize segmentation results
@@ -175,7 +175,7 @@ def objective_train_func(trial, FLAGS, cfg, logs, data_batches=None, hyperparame
     test_history = {}                                                                                       # Initialize the test_history dictionary as an empty dictionary
     if all([FLAGS.debugging == False, "vitrolife" in FLAGS.dataset_name.lower(), hyperparameter_optimization==False]):  # Inference will only be performed when training the Vitrolife model
         config.DATASETS.TEST = ("vitrolife_dataset_test",)                                                  # The inference will be done on the test dataset
-        eval_test_results,_,_,conf_matrix_test = evaluateResults(FLAGS, config, data_split="test")          # Evaluate the result metrics on the validation set with the best performing model
+        eval_test_results,_,_,conf_matrix_test, PN_test_pred_count, PN_test_true_count = evaluateResults(FLAGS, config, data_split="test")  # Evaluate the result metrics on the validation set with the best performing model
         _ = plot_confusion_matrix(config=config, conf_train=conf_matrix_train, conf_val=conf_matrix_val, conf_test=conf_matrix_test, done_training=True)
         test_pq_results = pq_evaluation(args=FLAGS, config=config, data_split="test")                       # Evaluate the Panoptic Quality for the test semantic segmentation results
         history_test = combineDataToHistoryDictionaryFunc(config=config, eval_metrics=eval_test_results["sem_seg"], pq_metrics=test_pq_results, data_split="test")
@@ -184,5 +184,5 @@ def objective_train_func(trial, FLAGS, cfg, logs, data_batches=None, hyperparame
 
     # Return the results
     if hyperparameter_optimization: return new_best
-    else: return history, test_history, new_best, best_epoch, config
+    else: return history, test_history, new_best, best_epoch, config, PN_test_pred_count, PN_test_true_count
     
