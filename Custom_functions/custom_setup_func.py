@@ -165,6 +165,7 @@ else:                                                                       # Ot
 if "nico" in MaskFormer_dir.lower():
     FLAGS.num_trials = 2
     FLAGS.num_epochs = 2
+    # FLAGS.hp_optim = False 
 
 # Create the initial configuration, define FLAGS epoch variables and alter the configuration
 cfg = createVitrolifeConfiguration(FLAGS=FLAGS)                             # Create the custom configuration used to e.g. build the model

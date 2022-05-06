@@ -89,8 +89,8 @@ def create_batch_img_ytrue_ypred(config, data_split, FLAGS, data_batch=None, mod
     img_ytrue_ypred = {"input": list(), "y_pred": list(), "y_true": list(), "PN": list()}   # Initiate a dictionary to store the input images, ground truth masks and the predicted masks
     for data in data_batch:                                                         # Iterate over each data sample in the batch from the dataloader
         img, y_pred, y_true = None, None, None                                      # Initiate the images as None variables before replacing them 
-        img = copy.deepcopy(torch.permute(data["image"], (1,2,0)).numpy())          # Input image [H,W,C]
-        y_true = copy.deepcopy(data["sem_seg"].numpy())                             # Ground truth label mask [H,W]
+        img = torch.permute(data["image"], (1,2,0)).numpy()                         # Input image [H,W,C]
+        y_true = data["sem_seg"].numpy()                                            # Ground truth label mask [H,W]
         y_true_col = apply_colormap(mask=y_true, config=config)                     # Ground truth color mask
         out = predictor.__call__(img)                                               # Predicted output dictionary. The call function needs images in BGR format.
         out_img = torch.permute(out["sem_seg"], (1,2,0))                            # Predicted output image [H,W,C]
