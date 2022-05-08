@@ -164,7 +164,7 @@ def visualize_the_images(config, FLAGS, position=[0.55, 0.08, 0.40, 0.75], epoch
                 else: plt.title("{:s}".format(key), fontdict=fontdict)              # Otherwise simply put the key, i.e. either input, y_pred or y_true.
                 plt.imshow(img, cmap="gray")                                        # Display the image
             row += 1                                                                # Increase the row counter by 1
-        if "nico" in config.OUTPUT_DIR.lower():
+        if any([x in config.OUTPUT_DIR.lower() for x in ["nico", "wd974261"]]):     # if on my local computer, where the figure is displayed ... 
             try: fig = move_figure_position(fig=fig, position=position)             # Try and move the figure to the wanted position (only possible on home computer with a display)
             except: pass                                                            # Except, simply just let the figure retain the current position
         fig_name_init = "Segmented_{:s}_data_samples_from_".format(data_split)      # Initialize the figure name

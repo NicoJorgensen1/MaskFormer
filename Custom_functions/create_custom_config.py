@@ -31,7 +31,7 @@ def createVitrolifeConfiguration(FLAGS):
     add_deeplab_config(cfg)                                                                 # Add some deeplab (i.e. sem_seg) config values
     add_mask_former_config(cfg)                                                             # Add some default values used for semantic segmentation to the config and choose datasetmapper
     if FLAGS.use_transformer_backbone==True:                                                # If the user chose the transformer backbone ...
-        swin_type = "tiny" if "nico" in MaskFormer_dir.lower() else "base"                  # If on home computer, use swin tiny. If on gpucluster, use swin base
+        swin_type = "tiny" if any([x in MaskFormer_dir.lower() for x in ["nico", "wd974261"]]) else "base"  # If on home computer, use swin tiny. If on gpucluster, use swin base
         swin_config = [x for x in os.listdir(os.path.join(config_folder, "swin")) if all([swin_type in x, x.endswith(".yaml")])][-1]    # Find the corresponding swin config
         cfg.merge_from_file(os.path.join(config_folder, "swin", swin_config))               # ... merge with the config for the chosen swin transformer
         if FLAGS.use_checkpoint==True:                                                      # If the user choose to start training from a earlier checkpoint ...

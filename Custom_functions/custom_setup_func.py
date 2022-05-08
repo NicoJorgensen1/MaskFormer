@@ -162,7 +162,7 @@ else:                                                                       # Ot
         MetadataCatalog["ade20k_sem_seg_{:s}".format(split)].num_files_in_dataset = len(DatasetCatalog["ade20k_sem_seg_{:s}".format(split)]())  # ... and create a key-value pair telling the number of files in the dataset
 
 # Lowering the number of trials and epochs if working on my local computer 
-if "nico" in MaskFormer_dir.lower():
+if any([x in MaskFormer_dir.lower() for x in ["nico", "wd974261"]]):
     FLAGS.num_trials = 2
     FLAGS.num_epochs = 2
     # FLAGS.hp_optim = False 

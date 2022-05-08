@@ -120,7 +120,7 @@ def perform_HPO():                                                              
         
         # Plot the results. Some problems have occured earlier, thus all plots are wrapped in try-except loops...
         HPO_fig_folder = os.path.join(cfg.OUTPUT_DIR, "Visualizations", "HPO_figures")
-        params_to_use = ["learning_rate", "dropout", "weight_decay"] if "nico" in MaskFormer_dir.lower() else None
+        params_to_use = ["learning_rate", "dropout", "weight_decay"] if any([x in MaskFormer_dir.lower() for x in ["nico", "wd974261"]]) else None
         os.makedirs(HPO_fig_folder, exist_ok=True) 
         try:
             contour_axes = optuna.visualization.matplotlib.plot_contour(study, params=params_to_use, target_name=FLAGS.eval_metric)

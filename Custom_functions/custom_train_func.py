@@ -36,7 +36,7 @@ def launch_custom_training(FLAGS, config, dataset, epoch=0, run_mode="train", hy
         if "vitrolife" in FLAGS.dataset_name.lower(): config.SOLVER.MAX_ITER = int(FLAGS.epoch_iter * (1 if FLAGS.use_per_pixel_baseline else 1.5)) # ... Transformer and ResNet backbones need a ...
         elif "ade20k" in FLAGS.dataset_name.lower(): config.SOLVER.MAX_ITER = int(FLAGS.epoch_iter * (1 if FLAGS.use_per_pixel_baseline else 2)/6)  # ... little more data to do well while searching...
     if "val" in run_mode and "ade20k" in FLAGS.dataset_name.lower(): config.SOLVER.MAX_ITER = int(np.ceil(np.divide(FLAGS.epoch_iter, 4)))
-    if "nico" in config.OUTPUT_DIR.lower():                                                                 # If I am working on my own local computer ...
+    if any([x in config.OUTPUT_DIR.lower() for x in ["nico", "wd974261"]]):                                 # If I am working on my own local computer ...
         config.SOLVER.MAX_ITER = int(np.min([FLAGS.epoch_iter, 15]))                                        # ... the maximum number of iterations is lowered 
     config.SOLVER.CHECKPOINT_PERIOD = config.SOLVER.MAX_ITER                                                # Save a new model checkpoint after each epoch
     if "train" in run_mode and hyperparameter_opt==False:                                                   # If we are training ... 
@@ -64,7 +64,7 @@ def get_HPO_params(config, FLAGS, trial, hpt_opt=False):
     if all([hpt_opt==True, trial is not None, FLAGS.hp_optim==True]):
         # Change the FLAGS parameters and then change the config
         FLAGS.learning_rate = trial.suggest_float(name="learning_rate", low=1e-6, high=1e-3)
-        FLAGS.batch_size = trial.suggest_int(name="batch_size", low=1, high=1 if "nico" in os.getenv("DETECTRON2_DATASETS").lower() else int(np.ceil(np.min(FLAGS.available_mem_info)/1350)))
+        FLAGS.batch_size = trial.suggest_int(name="batch_size", low=1, high=1 if any([x in os.getenv("DETECTRON2_DATASETS").lower() for x in ["nico", "wd974261"]]) else int(np.ceil(np.min(FLAGS.available_mem_info)/1350)))
         FLAGS.optimizer_used = trial.suggest_categorical(name="optimizer_used", choices=["ADAMW", "SGD"])
         FLAGS.weight_decay = trial.suggest_float(name="weight_decay", low=1e-8, high=2e-2)
         FLAGS.backbone_multiplier = trial.suggest_float("backbone_multiplier", low=1e-6, high=0.5) 
