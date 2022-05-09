@@ -3,9 +3,6 @@ import re
 import torch
 import torch.nn as nn
 import numpy as np
-import matplotlib
-import copy 
-matplotlib.use("pdf")
 from matplotlib import pyplot as plt
 from tqdm import tqdm                                                               # Used to set a progress bar
 from register_vitrolife_dataset import vitrolife_dataset_function
@@ -132,6 +129,7 @@ def sort_dictionary_by_PN(data):
 # data_batch=None
 # model_done_training=False
 
+
 # Define function to plot the images
 def visualize_the_images(config, FLAGS, position=[0.55, 0.08, 0.40, 0.75], epoch_num=None, data_batches=None, model_done_training=False):
     # Get the datasplit and number of images to show
@@ -175,6 +173,6 @@ def visualize_the_images(config, FLAGS, position=[0.55, 0.08, 0.40, 0.75], epoch
         fig_list.append(fig)                                                        # Append the current figure to the list of figures
         data_batches_final.append(data_batch)                                       # Append the current data_batch to the list of data_batches
         fig.show() if FLAGS.display_images==True else plt.close(fig)                # Display the figure if that is the chosen option
-    return fig_list, data_batches_final, config, FLAGS                              # Return the figure, the dictionary with the used images, the config and the FLAGS arguments
+    return fig_list, data_batches_final, config, FLAGS, img_ytrue_ypred             # Return the figure, the dictionary with the used images, the config and the FLAGS arguments
 
 

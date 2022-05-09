@@ -123,7 +123,8 @@ def objective_train_func(trial, FLAGS, cfg, logs, data_batches=None, hyperparame
     quit_training = False                                                                                   # Boolean value determining whether or not to commit early stopping
     epochs_to_run = 1 if hyperparameter_optimization else FLAGS.num_epochs                                  # We'll run only 1 epoch if we are performing HPO
     train_start_time = time()                                                                               # Now the training starts
-    epoch_next_display = FLAGS.display_rate - 1                                                             # The next epoch where the images must be visualized 
+    epoch_next_display = FLAGS.display_rate - 1                                                             # The next epoch where the images must be visualized
+    img_ytrue_ypred = None                                                                                  # Initiate a variable for the predicted images 
 
     # Change the FLAGS and config parameters and perform either hyperparameter optimization, use the best found parameters or simply just train
     config, FLAGS = get_HPO_params(config=cfg, FLAGS=FLAGS, trial=trial, hpt_opt=hyperparameter_optimization)
@@ -158,14 +159,17 @@ def objective_train_func(trial, FLAGS, cfg, logs, data_batches=None, hyperparame
                     quit_training = early_stopping(history=history, FLAGS=FLAGS)                            # ... perform the early stopping callback
             earlier_HPO_best = deepcopy(FLAGS.HPO_best_metric)                                              # Read the earlier best HPO value 
             earlier_train_best = deepcopy(new_best)                                                         # Read the earlier best train value 
+            used_best_val = earlier_HPO_best if hyperparameter_optimization else earlier_train_best         # If we are performing HPO, use the best HPO_metric as baseline, else best training metric 
             new_best, best_epoch = updateLogsFunc(log_file=logs, FLAGS=FLAGS, history=history, best_val=new_best,
                     train_start=train_start_time, epoch_start=epoch_start_time, best_epoch=best_epoch,
                     cur_epoch=FLAGS.HPO_current_trial if hyperparameter_optimization else epoch)
-            HPO_visualize = True if all([new_best <= earlier_HPO_best, "loss" in FLAGS.eval_metric, new_best <= 20]) or all([new_best >= earlier_HPO_best, "loss" not in FLAGS.eval_metric, new_best >= 20]) else False
-            train_visualize = True if epoch==epoch_next_display or all([new_best <= earlier_train_best, "loss" in FLAGS.eval_metric, new_best <= 20]) or all([new_best >= earlier_train_best, "loss" not in FLAGS.eval_metric, new_best >= 45]) else False 
-            if all([train_visualize, hyperparameter_optimization==False]) or all([hyperparameter_optimization, HPO_visualize]): # At least every 'display_rate' epochs or if the model has improved ...
-                _,data_batches,config,FLAGS = visualize_the_images(config=config, FLAGS=FLAGS, data_batches=data_batches, epoch_num=epoch+1)    # ... the model will segment and save visualizations ...
-                _ = plot_confusion_matrix(config=config, epoch=epoch+1, conf_train=conf_matrix_train, conf_val=conf_matrix_val)                 # ... and display confusion matrixes 
+            metrics_has_improved = all(["loss" in FLAGS.eval_metric, new_best < used_best_val]) or all(["loss" not in FLAGS.eval_metric, new_best > used_best_val])
+            HPO_visualize = True if metrics_has_improved and hyperparameter_optimization else False
+            train_visualize = True if epoch==epoch_next_display or all([metrics_has_improved, hyperparameter_optimization==False]) else False
+            if HPO_visualize or train_visualize:                                                            # At least every 'display_rate' epochs or if the model has improved ...
+                _,data_batches,config,FLAGS,img_ytrue_ypred = visualize_the_images(config=config, FLAGS=FLAGS, data_batches=data_batches, epoch_num=epoch+1)    # ... the model will segment and save visualizations ...
+                plot_confusion_matrix(config=config, epoch=epoch+1, conf_train=conf_matrix_train, conf_val=conf_matrix_val) # ... and display confusion matrixes 
+                SaveHistory(historyObject=img_ytrue_ypred, save_folder=config.OUTPUT_DIR, historyName="img_ytrue_ypred_trial_{}".format(FLAGS.HPO_current_trial))
             if quit_training == True:                                                                       # If the early stopping callback says we need to quit the training ...
                 printAndLog(input_to_write="Committing early stopping at epoch {:d}. The best {:s} is {:.3f} from epoch {:d}".format(epoch+1, FLAGS.eval_metric, new_best, best_epoch), logs=logs)
                 break                                                                                       # break the for loop and stop running more epochs
