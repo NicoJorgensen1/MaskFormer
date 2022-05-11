@@ -49,11 +49,11 @@ def vitrolife_dataset_function(run_mode="train", debugging=False):
         row = deepcopy(df_data.loc[hashkey,well])                                           # Find the row of the corresponding file in the dataframe
         data_split = row["split"]                                                           # Find the split for the current image, i.e. either train, val or test
         if data_split != run_mode: continue                                                 # If the current image is supposed to be in another split, then continue to the next image
-        mask_filename = glob.glob(os.path.join(vitrolife_dataset_filepath, 'masks', img_filename_wo_ext + '*')) # Find the corresponding mask filename
+        mask_filename = glob.glob(os.path.join(vitrolife_dataset_filepath, 'sem_seg_masks', img_filename_wo_ext + '*')) # Find the corresponding mask filename
         if len(mask_filename) != 1: continue                                                # Continue only if we find only one mask filename
         mask_filename = os.path.basename(mask_filename[0])                                  # Extract the mask filename from the list
         row["img_file"] = os.path.join(vitrolife_dataset_filepath, "raw_images", img_filename)  # Add the current filename for the input image to the row-variable
-        row["mask_file"] = os.path.join(vitrolife_dataset_filepath, "masks", mask_filename) # Add the current filename for the semantic segmentation ground truth mask to the row-variable
+        row["mask_file"] = os.path.join(vitrolife_dataset_filepath, "sem_seg_masks", mask_filename) # Add the current filename for the semantic segmentation ground truth mask to the row-variable
         mask = np.asarray(Image.open(row["mask_file"]))                                     # Read the ground truth label mask image
         if len(np.unique(mask)) <= 1: continue                                              # Apparently a test mask had only 0's, even though the corresponding input image was ordinary
         width_img, height_img = Image.open(row["img_file"]).size                            # Get the image size of the img_file
