@@ -164,7 +164,7 @@ def pq_evaluation(args, config, data_split="train", hp_optim=False):
             gt_dir = os.path.join(_root, "ADE20K_2021_17_01", "annotations_detectron2", "validation")
             segm_gt = read_image(os.path.join(gt_dir, image_id + ".tif")).copy().astype(np.int64)
         elif "vitrolife" in args.dataset_name.lower():
-            gt_dir = os.path.join(_root, "Vitrolife_dataset", "masks")
+            gt_dir = os.path.join(_root, "Vitrolife_dataset", "annotations_semantic_masks")
             gt_image_file = [x for x in os.listdir(gt_dir) if image_id.lower() in x.lower()]
             assert len(gt_image_file) == 1, "There should be one and only one mask image file per raw image"
             gt_image_file = gt_image_file[0]

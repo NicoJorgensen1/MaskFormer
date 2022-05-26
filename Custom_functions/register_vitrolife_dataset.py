@@ -22,7 +22,6 @@ def pickSamplesWithUniquePN(dataset_dict):
     return data_used
 
 
-
 # Define the function to return the list of dictionaries with information regarding all images available in the vitrolife dataset
 def vitrolife_dataset_function(run_mode="train", debugging=False):
     # Find the folder containing the vitrolife dataset  
@@ -35,11 +34,12 @@ def vitrolife_dataset_function(run_mode="train", debugging=False):
 
     # Create the list of dictionaries with information about all images
     img_mask_pair_list = []                                                                 # Initiate the list to store the information about all images
-    total_files = len(os.listdir(os.path.join(vitrolife_dataset_filepath, "raw_images")))   # List all the image files in the raw_images directory
+    all_files = natsorted(os.listdir(os.path.join(vitrolife_dataset_filepath, "raw_images")))   # List all the image files in the raw_images directory
+    total_files = len(all_files)                                                            # Get the length of all the files listed
     iteration_counter = 0                                                                   # Initiate a iteration counter 
     count = 0                                                                               # Initiate a counter to count the number of images inserted to the dataset
-    for img_filename in tqdm(os.listdir(os.path.join(vitrolife_dataset_filepath, "raw_images")),    # Loop through all files in the raw_images folder
-            total=total_files, unit="img", postfix="Read the Vitrolife {:s} dataset dictionaries".format(run_mode), leave=True,
+    for img_filename in tqdm(all_files, total=total_files, unit="img", leave=True,          # Loop through all files in the raw_images folder
+            postfix="Read the Vitrolife {:s} dataset dictionaries".format(run_mode), 
             bar_format="{desc}  | {percentage:3.0f}% | {bar:45}| {n_fmt}/{total_fmt} | [Spent: {elapsed}. Remaining: {remaining} | {postfix}]"):  
         iteration_counter += 1                                                              # Increase the counter that counts the number of iterations in the for-loop
         img_filename_wo_ext = os.path.splitext(os.path.basename(img_filename))[0]           # Get the image filename without .jpg extension
@@ -49,11 +49,11 @@ def vitrolife_dataset_function(run_mode="train", debugging=False):
         row = deepcopy(df_data.loc[hashkey,well])                                           # Find the row of the corresponding file in the dataframe
         data_split = row["split"]                                                           # Find the split for the current image, i.e. either train, val or test
         if data_split != run_mode: continue                                                 # If the current image is supposed to be in another split, then continue to the next image
-        mask_filename = glob.glob(os.path.join(vitrolife_dataset_filepath, 'sem_seg_masks', img_filename_wo_ext + '*')) # Find the corresponding mask filename
+        mask_filename = glob.glob(os.path.join(vitrolife_dataset_filepath, 'annotations_semantic_masks', img_filename_wo_ext + '*')) # Find the corresponding mask filename
         if len(mask_filename) != 1: continue                                                # Continue only if we find only one mask filename
         mask_filename = os.path.basename(mask_filename[0])                                  # Extract the mask filename from the list
         row["img_file"] = os.path.join(vitrolife_dataset_filepath, "raw_images", img_filename)  # Add the current filename for the input image to the row-variable
-        row["mask_file"] = os.path.join(vitrolife_dataset_filepath, "sem_seg_masks", mask_filename) # Add the current filename for the semantic segmentation ground truth mask to the row-variable
+        row["mask_file"] = os.path.join(vitrolife_dataset_filepath, "annotations_semantic_masks", mask_filename) # Add the current filename for the semantic segmentation ground truth mask to the row-variable
         mask = np.asarray(Image.open(row["mask_file"]))                                     # Read the ground truth label mask image
         if len(np.unique(mask)) <= 1: continue                                              # Apparently a test mask had only 0's, even though the corresponding input image was ordinary
         width_img, height_img = Image.open(row["img_file"]).size                            # Get the image size of the img_file
@@ -71,7 +71,6 @@ def vitrolife_dataset_function(run_mode="train", debugging=False):
             if count >= 15:                                                                 # ... and more than 15 samples has already been registered ...
                 break                                                                       # ... skip the rest of the files 
     assert len(img_mask_pair_list) >= 1, print("No image/mask pairs found in {:s} subfolders 'raw_image' and 'masks'".format(vitrolife_dataset_filepath))
-    img_mask_pair_list = natsorted(img_mask_pair_list)                                      # Sorting the list assures the same every time this function runs
     if debugging==True: img_mask_pair_list=pickSamplesWithUniquePN(img_mask_pair_list)      # If we are debugging, we'll only get one sample with each number of PN's 
     return img_mask_pair_list                                                               # Return the found list of dictionaries
 
