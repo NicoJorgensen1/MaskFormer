@@ -77,7 +77,6 @@ def changeFLAGS(FLAGS):
     if FLAGS.debugging: FLAGS.eval_metric.replace("val", "train")           # The metric used for evaluation will be a training metric, if we are debugging the model
     if FLAGS.use_per_pixel_baseline: FLAGS.resnet_depth = 50                # The per-pixel baseline can only be used with a ResNet depth of 50 
     if FLAGS.inference_only: FLAGS.num_epochs = 1                           # If we are only using inference, then we'll only run through one epoch
-    FLAGS.num_queries = 100 if FLAGS.dataset_name=="ade20k" else 25         # The number of queries will be set to 100 with the ADE20K dataset and 25 with the Vitrolife dataset
     FLAGS.HPO_current_trial = 0                                             # A counter for the number of trials of hyperparameter optimization performed 
     FLAGS.epoch_num = 0                                                     # A counter iterating over the number of epochs 
     FLAGS.HPO_best_metric = np.inf if "loss" in FLAGS.eval_metric.lower() else -np.inf  # Create variable to keep track of the best results obtained when performing HPO
@@ -120,7 +119,7 @@ parser.add_argument("--max_iter", type=int, default=int(1e5), help="Maximum numb
 parser.add_argument("--img_size_min", type=int, default=500, help="The length of the smallest size of the training images. Default: 500")
 parser.add_argument("--img_size_max", type=int, default=500, help="The length of the largest size of the training images. Default: 500")
 parser.add_argument("--resnet_depth", type=int, default=101, help="The depth of the feature extracting ResNet backbone. Possible values: [18,34,50,101] Default: 101")
-parser.add_argument("--batch_size", type=int, default=1, help="The batch size used for training the model. Default: 1")
+parser.add_argument("--batch_size", type=int, default=4, help="The batch size used for training the model. Default: 1")
 parser.add_argument("--num_images", type=int, default=6, help="The number of images to display/segment. Default: 6")
 parser.add_argument("--num_trials", type=int, default=1000, help="The number of trials to run HPO for. Only relevant if '--hp_optim==True'. Default: 300")
 parser.add_argument("--num_random_trials", type=int, default=100, help="The number of random trials to run initiate the HPO for. Only relevant if '--hp_optim==True'. Default: 30")
@@ -131,12 +130,13 @@ parser.add_argument("--warm_up_epochs", type=int, default=5, help="The number of
 parser.add_argument("--patience", type=int, default=5, help="The number of epochs to accept that the model hasn't improved before lowering the learning rate by a factor '--lr_gamma'. Default: 5")
 parser.add_argument("--early_stop_patience", type=int, default=13, help="The number of epochs to accept that the model hasn't improved before terminating training. Default: 12")
 parser.add_argument("--backbone_freeze_layers", type=int, default=0, help="The number of layers in the backbone to freeze when training. Available [0,1,2,3,4,5]. Default: 0")
-parser.add_argument("--dice_loss_weight", type=int, default=10, help="The weighting for the dice loss in the loss function. Default: 10")
-parser.add_argument("--mask_loss_weight", type=int, default=20, help="The weighting for the mask loss in the loss function. Default: 20")
-parser.add_argument("--learning_rate", type=float, default=1e-3, help="The initial learning rate used for training the model. Default: 1e-3")
+parser.add_argument("--dice_loss_weight", type=int, default=6, help="The weighting for the dice loss in the loss function. Default: 10")
+parser.add_argument("--mask_loss_weight", type=int, default=9, help="The weighting for the mask loss in the loss function. Default: 20")
+parser.add_argument("--num_queries", type=int, default=75, help="The number of queries used for training. Default: 75")
+parser.add_argument("--learning_rate", type=float, default=2e-4, help="The initial learning rate used for training the model. Default: 1e-3")
 parser.add_argument("--lr_gamma", type=float, default=0.15, help="The update factor for the learning rate when the model performance hasn't improved in 'patience' epochs. Will do new_lr=old_lr*lr_gamma. Default 0.15")
-parser.add_argument("--backbone_multiplier", type=float, default=0.25, help="The multiplier for the backbone learning rate. Backbone_lr = learning_rate * backbone_multiplier. Default: 0.20")
-parser.add_argument("--dropout", type=float, default=0.10, help="The dropout rate used for the linear layers. Default: 0.10")
+parser.add_argument("--backbone_multiplier", type=float, default=0.20, help="The multiplier for the backbone learning rate. Backbone_lr = learning_rate * backbone_multiplier. Default: 0.20")
+parser.add_argument("--dropout", type=float, default=0.05, help="The dropout rate used for the linear layers. Default: 0.10")
 parser.add_argument("--weight_decay", type=float, default=1e-4, help="The weight decay used for the model. Default: 1e-4")
 parser.add_argument("--min_delta", type=float, default=5e-4, help="The minimum improvement the model must have made in order to be accepted as an actual improvement. Default 5e-4")
 parser.add_argument("--ignore_background", type=str2bool, default=False, help="Whether or not we are ignoring the background class. True = Ignore background, False = reward/penalize for background predictions. Default: False")
