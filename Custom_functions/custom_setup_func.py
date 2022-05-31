@@ -3,6 +3,7 @@ import os                                                                   # Us
 import numpy as np                                                          # Used for computing the iterations per epoch
 import argparse                                                             # Used to parse input arguments through command line
 import pickle                                                               # Used to save the history dictionary after training
+from copy import deepcopy                                                   # Used to make a hard copy of an object/variable, and not just make a reference pointer 
 from datetime import datetime                                               # Used to get the current date and time when starting the process
 from shutil import make_archive                                             # Used to zip the directory of the output folder
 from detectron2.data import DatasetCatalog, MetadataCatalog                 # Catalogs over registered datasets  ...
@@ -82,6 +83,7 @@ def changeFLAGS(FLAGS):
     FLAGS.HPO_best_metric = np.inf if "loss" in FLAGS.eval_metric.lower() else -np.inf  # Create variable to keep track of the best results obtained when performing HPO
     FLAGS.quit_training = False                                             # The initial value for the "quit_training" parameter should be False
     FLAGS.ignore_label = 0 if FLAGS.ignore_background else 255              # As default no labels will be ignored 
+    FLAGS.batch_size = int(FLAGS.batch_size) 
     return FLAGS
 
 # Define a function to extract the final results that will be printed in the log file
@@ -102,7 +104,13 @@ def SaveHistory(historyObject, save_folder, historyName="history"):         # Fu
 
 # Write the new config as a .yaml file
 def write_config_to_file(config):
-    with open(os.path.join(config.OUTPUT_DIR, "config_file"), "w") as f:    # Open a object instance with the config file
+    config = deepcopy(config)                                               # Make a hard copy of the config
+    # config.pop("custom_key")                                                # Remove the "custom_key" key-set
+    config_prefix = "vitrolife_" if "vitrolife" in config.DATASETS.TRAIN[0].lower() else "" # Prepend 'vitrolife' to the config filename, if we are using the Vitrolife dataset
+    config_filename = os.path.join(config.OUTPUT_DIR, "{}config_file.yaml".format(config_prefix))   # Create the config filename
+    if os.path.isfile(config_filename):                                     # If a file already exists with the config filename ...
+        os.remove(config_filename)                                          # ... delete that file 
+    with open(config_filename, "w") as f:                                   # Open a object instance with the config file
         f.write(config.dump())                                              # Dump the configuration to a file named config_name in cfg.OUTPUT_DIR
     f.close()                                                               # Close the writer handle again 
 
@@ -121,8 +129,8 @@ parser.add_argument("--img_size_max", type=int, default=500, help="The length of
 parser.add_argument("--resnet_depth", type=int, default=101, help="The depth of the feature extracting ResNet backbone. Possible values: [18,34,50,101] Default: 101")
 parser.add_argument("--batch_size", type=int, default=4, help="The batch size used for training the model. Default: 1")
 parser.add_argument("--num_images", type=int, default=6, help="The number of images to display/segment. Default: 6")
-parser.add_argument("--num_trials", type=int, default=1000, help="The number of trials to run HPO for. Only relevant if '--hp_optim==True'. Default: 300")
-parser.add_argument("--num_random_trials", type=int, default=100, help="The number of random trials to run initiate the HPO for. Only relevant if '--hp_optim==True'. Default: 30")
+parser.add_argument("--num_trials", type=int, default=200, help="The number of trials to run HPO for. Only relevant if '--hp_optim==True'. Default: 150")
+parser.add_argument("--num_random_trials", type=int, default=10, help="The number of random trials to run initiate the HPO for. Only relevant if '--hp_optim==True'. Default: 10")
 parser.add_argument("--display_rate", type=int, default=5, help="The epoch_rate of how often to display image segmentations. A display_rate of 3 means that every third epoch, visual segmentations are saved. Default: 5")
 parser.add_argument("--gpus_used", type=int, default=1, help="The number of GPU's to use for training. Only applicable for training with ADE20K. This input argument deprecates the '--num-gpus' argument. Default: 1")
 parser.add_argument("--num_epochs", type=int, default=250, help="The number of epochs to train the model for. Default: 1")
@@ -146,7 +154,7 @@ parser.add_argument("--inference_only", type=str2bool, default=False, help="Whet
 parser.add_argument("--display_images", type=str2bool, default=False, help="Whether or not some random sample images are displayed before training starts. Default: False")
 parser.add_argument("--use_checkpoint", type=str2bool, default=False, help="Whether or not we are loading weights from a model checkpoint file before training. Default: False")
 parser.add_argument("--use_transformer_backbone", type=str2bool, default=False, help="Whether or not we are using the extended swin_small_transformer backbone. Only applicable if '--use_per_pixel_baseline'=False. Default: True")
-parser.add_argument("--use_per_pixel_baseline", type=str2bool, default=True, help="Whether or not we are using the per_pixel_calculating head. Alternative is the MaskFormer (or transformer) heads. Default: False")
+parser.add_argument("--use_per_pixel_baseline", type=str2bool, default=False, help="Whether or not we are using the per_pixel_calculating head. Alternative is the MaskFormer (or transformer) heads. Default: False")
 parser.add_argument("--debugging", type=str2bool, default=False, help="Whether or not we are debugging the script. Default: False")
 # Parse the arguments into a Namespace variable
 FLAGS = parser.parse_args()

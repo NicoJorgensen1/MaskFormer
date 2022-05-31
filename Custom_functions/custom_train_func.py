@@ -18,12 +18,12 @@ from custom_pq_eval_func import pq_evaluation                                   
 from visualize_conf_matrix import plot_confusion_matrix                                                     # Function to plot the available confusion matrixes
 
 
-def setup(cfg):
-    setup_logger(output=cfg.OUTPUT_DIR, distributed_rank=comm.get_rank(), name="mask_former")               # Setup a logger for the mask module
-    return cfg                                                                                              # Return the completed configuration
+# def setup(cfg):
+#     setup_logger(output=cfg.OUTPUT_DIR, distributed_rank=comm.get_rank(), name="mask_former")               # Setup a logger for the mask module
+    # return cfg                                                                                              # Return the completed configuration
 
 def run_train_func(cfg, run_mode):
-    cfg = setup(cfg)
+    # cfg = setup(cfg)
     Trainer = My_GoTo_Trainer(cfg)
     Trainer.resume_or_load(resume=False)
     return Trainer.train()
@@ -114,14 +114,14 @@ def objective_train_func(trial, FLAGS, cfg, logs, data_batches=None, hyperparame
     train_mode = "min" if "loss" in FLAGS.eval_metric else "max"                                            # Compute the mode of which the performance should be measured. Either a negative or a positive value is better
     new_best = np.inf if train_mode=="min" else -np.inf                                                     # Initiate the original "best_value" as either infinity or -infinity according to train_mode
     best_epoch = 0                                                                                          # Initiate the best epoch as being epoch_0, i.e. before doing any model training
-    eval_train_results = {"sem_seg": []}                                                                    # Set the training evaluation results as an empty dictionary 
-    train_pq_results = {}                                                                                   # Set training PQ results to be an empty dictionary
+    train_pq_results, val_pq_results, eval_train_results = None, None, None                                 # Set train/val PQ results and evaluation results as None values
     conf_matrix_train, conf_matrix_val, conf_matrix_test = None, None, None                                 # Initialize the confusion matrixes as None values 
     train_dataset = cfg.DATASETS.TRAIN                                                                      # Get the training dataset name
     val_dataset = cfg.DATASETS.TEST                                                                         # Get the validation dataset name
     lr_update_check = np.zeros((FLAGS.patience, 1), dtype=bool)                                             # Preallocating validation array to determine whether or not the learning rate was updated
     quit_training = False                                                                                   # Boolean value determining whether or not to commit early stopping
     epochs_to_run = 1 if hyperparameter_optimization else FLAGS.num_epochs                                  # We'll run only 1 epoch if we are performing HPO
+    epochs_to_run = 1 if FLAGS.inference_only else epochs_to_run                                            # If we are just performing inference, then we'll only go through the dataset once 
     train_start_time = time()                                                                               # Now the training starts
     epoch_next_display = FLAGS.display_rate - 1                                                             # The next epoch where the images must be visualized
     img_ytrue_ypred = None                                                                                  # Initiate a variable for the predicted images 
@@ -135,17 +135,19 @@ def objective_train_func(trial, FLAGS, cfg, logs, data_batches=None, hyperparame
             epoch_start_time = time()                                                                       # Now this new epoch starts
             if FLAGS.inference_only==False:
                 config = launch_custom_training(FLAGS=FLAGS, config=config, dataset=train_dataset, epoch=epoch, run_mode="train", hyperparameter_opt=hyperparameter_optimization)   # Launch the training loop for one epoch
-                eval_train_results, train_loader, train_evaluator, conf_matrix_train, _, _ = evaluateResults(FLAGS, config, data_split="train", dataloader=train_loader, evaluator=train_evaluator, hp_optim=hyperparameter_optimization) # Evaluate the result on the training set
-                train_pq_results = pq_evaluation(args=FLAGS, config=config, data_split="train", hp_optim=hyperparameter_optimization)   # Evaluate the Panoptic Quality for the training semantic segmentation results  
+                if not hyperparameter_optimization:
+                    eval_train_results, train_loader, train_evaluator, conf_matrix_train, _, _ = evaluateResults(FLAGS, config, data_split="train", dataloader=train_loader, evaluator=train_evaluator, hp_optim=hyperparameter_optimization) # Evaluate the result on the training set
+                    train_pq_results = pq_evaluation(args=FLAGS, config=config, data_split="train", hp_optim=hyperparameter_optimization)   # Evaluate the Panoptic Quality for the training semantic segmentation results  
             
             # Validation period. Will 'train' with lr=0 on validation data, correct the metrics files and evaluate performance on validation data
             config = launch_custom_training(FLAGS=FLAGS, config=config, dataset=val_dataset, epoch=epoch, run_mode="val", hyperparameter_opt=hyperparameter_optimization)   # Launch the training loop for one epoch
             eval_val_results, val_loader, val_evaluator, conf_matrix_val, _, _ = evaluateResults(FLAGS, config, data_split="val", dataloader=val_loader, evaluator=val_evaluator) # Evaluate the result metrics on the training set
-            val_pq_results = pq_evaluation(args=FLAGS, config=config, data_split="val")                     # Evaluate the Panoptic Quality for the validation semantic segmentation results
+            if not hyperparameter_optimization:
+                val_pq_results = pq_evaluation(args=FLAGS, config=config, data_split="val")                 # Evaluate the Panoptic Quality for the validation semantic segmentation results
             
             # Prepare for the training phase of the next epoch. Switch back to training dataset, save history and learning curves and visualize segmentation results
-            history = show_history(config=config, FLAGS=FLAGS, metrics_train=eval_train_results["sem_seg"], # Create and save the learning curves ...
-                metrics_eval=eval_val_results["sem_seg"], history=history, pq_train=train_pq_results, pq_val=val_pq_results)    # ... including all training and validation metrics
+            history = show_history(config=config, FLAGS=FLAGS, metrics_train=eval_train_results,            # Create and save the learning curves ...
+                metrics_eval=eval_val_results, history=history, pq_train=train_pq_results, pq_val=val_pq_results)    # ... including all training and validation metrics
             SaveHistory(historyObject=history, save_folder=config.OUTPUT_DIR)                               # Save the history dictionary after each epoch
             [os.remove(os.path.join(config.OUTPUT_DIR, x)) for x in os.listdir(config.OUTPUT_DIR) if "events.out.tfevent" in x]
             
@@ -168,13 +170,17 @@ def objective_train_func(trial, FLAGS, cfg, logs, data_batches=None, hyperparame
             train_visualize = True if epoch==epoch_next_display or all([metrics_has_improved, hyperparameter_optimization==False]) else False
             if HPO_visualize or train_visualize:                                                            # At least every 'display_rate' epochs or if the model has improved ...
                 _,data_batches,config,FLAGS,img_ytrue_ypred = visualize_the_images(config=config, FLAGS=FLAGS, data_batches=data_batches, epoch_num=epoch+1)    # ... the model will segment and save visualizations ...
-                plot_confusion_matrix(config=config, epoch=epoch+1, conf_train=conf_matrix_train, conf_val=conf_matrix_val) # ... and display confusion matrixes 
-                SaveHistory(historyObject=img_ytrue_ypred, save_folder=config.OUTPUT_DIR, historyName="img_ytrue_ypred_trial_{}".format(FLAGS.HPO_current_trial))
+                if not hyperparameter_optimization:
+                    plot_confusion_matrix(config=config, epoch=epoch+1, conf_train=conf_matrix_train, conf_val=conf_matrix_val) # ... and display confusion matrixes 
+                    SaveHistory(historyObject=img_ytrue_ypred, save_folder=config.OUTPUT_DIR, historyName="img_ytrue_ypred_trial_{}".format(FLAGS.HPO_current_trial))
             if quit_training == True:                                                                       # If the early stopping callback says we need to quit the training ...
                 printAndLog(input_to_write="Committing early stopping at epoch {:d}. The best {:s} is {:.3f} from epoch {:d}".format(epoch+1, FLAGS.eval_metric, new_best, best_epoch), logs=logs)
                 break                                                                                       # break the for loop and stop running more epochs
         except Exception as ex:
             error_string = "An exception of type {} occured while doing epoch {}/{}. Arguments:\n{!r}".format(type(ex).__name__, epoch+1, epochs_to_run, ex.args)
+            if isinstance(ex, FloatingPointError):
+                printAndLog(input_to_write="Lowering the learning rate as the loss became nan or inf", logs=logs)
+                config.SOLVER.BASE_LR = config.SOLVER.BASE_LR * FLAGS.lr_gamma
             printAndLog(input_to_write=error_string, logs=logs, prefix="", postfix="\n")
 
     # Evaluation on the vitrolife test dataset. There is no ADE20K-test dataset.

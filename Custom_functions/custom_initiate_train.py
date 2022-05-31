@@ -33,6 +33,7 @@ from custom_HPO_function import perform_HPO                                     
 
 # Get the FLAGS, the config and the logfile. 
 FLAGS, cfg, trial, log_file = perform_HPO()                                                         # Perform HPO if that is chosen 
+write_config_to_file(config=cfg)                                                                    # Save the config file with the final parameters used in the output dir
 printAndLog(input_to_write="FLAGS input arguments:", logs=log_file)                                 # Print the new, updated FLAGS ...
 printAndLog(input_to_write={key: vars(FLAGS)[key] for key in sorted(vars(FLAGS).keys())},           # ...  input arguments to the logfile ...
             logs=log_file, oneline=False, length=27)                                                # ... sorted by the key names 
@@ -71,6 +72,5 @@ SaveHistory(historyObject=test_history, save_folder=cfg.OUTPUT_DIR, historyName=
 
 # Remove all metrics.json files, the default log-file and zip the resulting output directory
 [os.remove(os.path.join(cfg.OUTPUT_DIR, x)) for x in os.listdir(cfg.OUTPUT_DIR) if "metrics" in x.lower() and x.endswith(".json")]
-os.remove(os.path.join(cfg.OUTPUT_DIR, "log.txt"))
 
 zip_output(cfg)

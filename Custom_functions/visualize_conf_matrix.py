@@ -42,7 +42,10 @@ def plot_confusion_matrix(config, epoch=0, conf_train=None, conf_val=None, conf_
             if row_fig+1 >= n_rows:                                                                 # If we are plotting on the second row ...
                 conf_matrix = normalizeConfMatrix(conf_matrix)                                      # ... the confusion matrix must be normalized along rows (i.e. each true label) instead of normalized over all pixels
                 tit_ext = " normalized"                                                             # ... the title will get the prefix "normalized"
-            ax = axs[row_fig,kk]                                                                    # Set ax as the current axes
+            if n_cols == 1:
+                ax = axs[row_fig]
+            else:
+                ax = axs[row_fig,kk]                                                                # Set ax as the current axes
             im = ax.imshow(conf_matrix, cmap="jet", vmin=0, vmax=val_max)                           # Display the image
             ax.set(xticks=np.arange(0, len(labels)), yticks=np.arange(0, len(labels)),              # Set the tick parameters ...
                 xticklabels=labels, yticklabels=labels, xlabel="Predicted labels", ylabel="True labels")    # ... including tick labels

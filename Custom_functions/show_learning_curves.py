@@ -115,8 +115,13 @@ def show_history(config, FLAGS, metrics_train, metrics_eval, pq_train, pq_val, h
     Mean pixel accuracy averaged across classes (mACC)
     Pixel Accuracy (pACC)
     """
+    if metrics_train is not None:
+        metrics_train = metrics_train["sem_seg"]
+    if metrics_eval is not None:
+        metrics_eval = metrics_eval["sem_seg"]
+    
     # Create history and list of relevant history keys
-    if FLAGS.inference_only==False or FLAGS.hp_optim==False:
+    if any([FLAGS.inference_only==False, FLAGS.hp_optim==False]) and all([metrics_train is not None, pq_train is not None]):
         history = combineDataToHistoryDictionaryFunc(config=config, eval_metrics=metrics_train, pq_metrics=pq_train, data_split="train", history=history)
     history = combineDataToHistoryDictionaryFunc(config=config, eval_metrics=metrics_eval, pq_metrics=pq_val, data_split="val", history=history)
     hist_keys = extractRelevantHistoryKeys(history)
