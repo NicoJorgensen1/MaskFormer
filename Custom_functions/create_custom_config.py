@@ -69,7 +69,7 @@ def changeConfig_withFLAGS(cfg, FLAGS):
     cfg.MODEL.PANOPTIC_FPN.COMBINE.ENABLED = False                                          # Disable the panoptic head during inference
     cfg.DATALOADER.NUM_WORKERS = FLAGS.num_workers                                          # Set the number of workers to only 2
     cfg.DATALOADER.ASPECT_RATIO_GROUPING = False                                            # We'll simply shuffle the input data, we won't group them after aspect ratios, even though that would be more GPU efficient
-    cfg.INPUT.CROP.ENABLED =  FLAGS.crop_enabled                                            # We will not allow any cropping of the input images
+    cfg.INPUT.CROP.ENABLED = FLAGS.crop_enabled                                             # We will not allow any cropping of the input images
     cfg.MODEL.DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'                       # Assign the device on which the model should run
     cfg.MODEL.MASK_FORMER.DICE_WEIGHT = FLAGS.dice_loss_weight                              # Set the weight for the dice loss (original 2)
     cfg.MODEL.MASK_FORMER.MASK_WEIGHT = FLAGS.mask_loss_weight                              # Set the weight for the mask predictive loss (original 20)
@@ -80,9 +80,9 @@ def changeConfig_withFLAGS(cfg, FLAGS):
     cfg.MODEL.MASK_FORMER.NUM_OBJECT_QUERIES = FLAGS.num_queries                            # The number of queries to detect from the Transformer module 
     cfg.MODEL.BACKBONE.FREEZE_AT = FLAGS.backbone_freeze_layers                             # The number of backbone layers to freeze of the backbone 
     cfg.MODEL.RESNETS.DEPTH = FLAGS.resnet_depth                                            # The number of layers in the ResNet backbone 
-    cfg.MODEL.SEM_SEG_HEAD.LOSS_WEIGHT = 2                                                  # Increase loss weight for the sem_seg_head
+    cfg.MODEL.SEM_SEG_HEAD.LOSS_WEIGHT = 1                                                  # Increase loss weight for the sem_seg_head
     cfg.TEST.EVAL_PERIOD = 0                                                                # We won't use the build in evaluation, only the custom evaluation function
-    cfg.SOLVER.CHECKPOINT_PERIOD = FLAGS.epoch_iter                                         # Save a new model checkpoint after each epoch, i.e. after everytime the entire trainining set has been seen by the model
+    cfg.SOLVER.CHECKPOINT_PERIOD = FLAGS.epoch_iter*15                                      # Save a new model checkpoint after each epoch, i.e. after everytime the entire trainining set has been seen by the model
     cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST = 0.05                                            # Assign the IoU threshold used for the model
     cfg.INPUT.FORMAT = "BGR"                                                                # The input format is set to be BGR, like the visualization method
     cfg.OUTPUT_DIR = os.path.join(MaskFormer_dir, "output_{:s}{:s}".format("vitrolife_" if "vitro" in FLAGS.dataset_name.lower() else "", FLAGS.output_dir_postfix))    # Get MaskFormer directory and name the output directory

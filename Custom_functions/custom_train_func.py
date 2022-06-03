@@ -18,12 +18,7 @@ from custom_pq_eval_func import pq_evaluation                                   
 from visualize_conf_matrix import plot_confusion_matrix                                                     # Function to plot the available confusion matrixes
 
 
-# def setup(cfg):
-#     setup_logger(output=cfg.OUTPUT_DIR, distributed_rank=comm.get_rank(), name="mask_former")               # Setup a logger for the mask module
-    # return cfg                                                                                              # Return the completed configuration
-
 def run_train_func(cfg, run_mode):
-    # cfg = setup(cfg)
     Trainer = My_GoTo_Trainer(cfg)
     Trainer.resume_or_load(resume=False)
     return Trainer.train()
@@ -33,7 +28,7 @@ def launch_custom_training(FLAGS, config, dataset, epoch=0, run_mode="train", hy
     FLAGS.epoch_iter = int(np.floor(np.divide(FLAGS.num_train_files, FLAGS.batch_size)))                    # Compute the number of iterations per training epoch with the given batch size
     config.SOLVER.MAX_ITER = FLAGS.epoch_iter * (7 if all(["train" in run_mode, hyperparameter_opt==False, "vitrolife" in FLAGS.dataset_name.lower()]) else 1)  # Increase training iteration count for precise BN computations
     if all(["train" in run_mode, hyperparameter_opt==True]):
-        if "vitrolife" in FLAGS.dataset_name.lower(): config.SOLVER.MAX_ITER = int(FLAGS.epoch_iter * (1 if FLAGS.use_per_pixel_baseline else 1.5)) # ... Transformer and ResNet backbones need a ...
+        if "vitrolife" in FLAGS.dataset_name.lower(): config.SOLVER.MAX_ITER = int(FLAGS.epoch_iter * (1 if FLAGS.use_per_pixel_baseline else 2.0)) # ... Transformer and ResNet backbones need a ...
         elif "ade20k" in FLAGS.dataset_name.lower(): config.SOLVER.MAX_ITER = int(FLAGS.epoch_iter * (1 if FLAGS.use_per_pixel_baseline else 2)/6)  # ... little more data to do well while searching...
     if "val" in run_mode and "ade20k" in FLAGS.dataset_name.lower(): config.SOLVER.MAX_ITER = int(np.ceil(np.divide(FLAGS.epoch_iter, 4)))
     if any([x in config.OUTPUT_DIR.lower() for x in ["nico", "wd974261"]]):                                 # If I am working on my own local computer ...
@@ -45,8 +40,12 @@ def launch_custom_training(FLAGS, config, dataset, epoch=0, run_mode="train", hy
                 config.custom_key[-idx-1] = (item[0], item[1]+1)                                            # The current epoch number is updated 
                 break                                                                                       # And the loop is broken out of 
     config = putModelWeights(config)                                                                        # Assign the latest saved model to the config
-    if "val" in run_mode.lower(): config.SOLVER.BASE_LR = float(0)                                          # If we are on the validation split set the learning rate to 0
-    else: config.SOLVER.BASE_LR = FLAGS.learning_rate                                                       # Else, we are on the training split, so assign the latest saved learning rate to the config
+    if "train" in run_mode.lower():                                                                         # If we are on the training split ...
+        config.SOLVER.BASE_LR = FLAGS.learning_rate                                                         # ... set the latest saved learning rate to the config
+        config.MODEL.MASK_FORMER.DROPOUT = FLAGS.dropout                                                    # ... set the dropout to the chosen dropout value
+    else:                                                                                                   # Else, if we are on the validation set 
+        config.SOLVER.BASE_LR = float(0)                                                                    # ... set the learning rate to 0
+        config.MODEL.MASK_FORMER.DROPOUT = 0                                                                # ... set the dropout to 0 
     config.DATASETS.TRAIN = dataset                                                                         # Change the config dataset used to the dataset sent along ...
     run_train_func(cfg=config, run_mode=run_mode)                                                           # Run the training for the current epoch
     shutil.copyfile(os.path.join(config.OUTPUT_DIR, "metrics.json"),                                        # Rename the metrics.json to "run_mode"_metricsX.json ...
@@ -64,15 +63,15 @@ def get_HPO_params(config, FLAGS, trial, hpt_opt=False):
     if all([hpt_opt==True, trial is not None, FLAGS.hp_optim==True]):
         # Change the FLAGS parameters and then change the config
         FLAGS.learning_rate = trial.suggest_float(name="learning_rate", low=1e-6, high=1e-3)
-        FLAGS.batch_size = trial.suggest_int(name="batch_size", low=1, high=1 if any([x in os.getenv("DETECTRON2_DATASETS").lower() for x in ["nico", "wd974261"]]) else int(np.ceil(np.min(FLAGS.available_mem_info)/1350)))
+        FLAGS.batch_size = trial.suggest_int(name="batch_size", low=1, high=int(np.ceil(np.min(FLAGS.available_mem_info)/1250)))
         FLAGS.optimizer_used = trial.suggest_categorical(name="optimizer_used", choices=["ADAMW", "SGD"])
-        FLAGS.weight_decay = trial.suggest_float(name="weight_decay", low=1e-8, high=2e-2)
+        FLAGS.weight_decay = trial.suggest_float(name="weight_decay", low=1e-8, high=3e-1)
         FLAGS.backbone_multiplier = trial.suggest_float("backbone_multiplier", low=1e-6, high=0.5) 
-        FLAGS.dice_loss_weight = trial.suggest_int(name="dice_loss_weight", low=2, high=25)
-        FLAGS.mask_loss_weight = trial.suggest_int(name="mask_loss_weight", low=2, high=25)
-        FLAGS.dropout = trial.suggest_float(name="dropout", low=1e-8, high=0.5)
+        FLAGS.dice_loss_weight = trial.suggest_int(name="dice_loss_weight", low=1, high=25)
+        FLAGS.mask_loss_weight = trial.suggest_int(name="mask_loss_weight", low=1, high=25)
+        FLAGS.dropout = trial.suggest_float(name="dropout", low=1e-10, high=0.75)
         if "vitrolife" in FLAGS.dataset_name:
-            FLAGS.num_queries = trial.suggest_int(name="num_queries", low=15, high=150) 
+            FLAGS.num_queries = trial.suggest_int(name="num_queries", low=10, high=250) 
             FLAGS.use_checkpoint = bool(trial.suggest_categorical(name="use_checkpoint", choices=["True", "False"]))
         if FLAGS.use_transformer_backbone==False:
             FLAGS.resnet_depth = trial.suggest_categorical(name="resnet_depth", choices=[50, 101])
