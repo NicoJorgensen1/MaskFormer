@@ -84,7 +84,7 @@ def changeConfig_withFLAGS(cfg, FLAGS):
     cfg.MODEL.RESNETS.DEPTH = FLAGS.resnet_depth                                            # The number of layers in the ResNet backbone 
     cfg.MODEL.SEM_SEG_HEAD.LOSS_WEIGHT = 1                                                  # Increase loss weight for the sem_seg_head
     cfg.TEST.EVAL_PERIOD = 0                                                                # We won't use the build in evaluation, only the custom evaluation function
-    cfg.SOLVER.CHECKPOINT_PERIOD = FLAGS.epoch_iter*15                                      # Save a new model checkpoint after each epoch, i.e. after everytime the entire trainining set has been seen by the model
+    cfg.SOLVER.CHECKPOINT_PERIOD = int(cfg.SOLVER.MAX_ITER*1e5)                             # Save a new model checkpoint after each epoch, i.e. after everytime the entire trainining set has been seen by the model
     cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST = 0.05                                            # Assign the IoU threshold used for the model
     cfg.INPUT.FORMAT = "BGR"                                                                # The input format is set to be BGR, like the visualization method
     cfg.OUTPUT_DIR = os.path.join(MaskFormer_dir, "output_{:s}{:s}".format("vitrolife_" if "vitro" in FLAGS.dataset_name.lower() else "", FLAGS.output_dir_postfix))    # Get MaskFormer directory and name the output directory

@@ -4,8 +4,6 @@ import os                                                                       
 import numpy as np                                                                                          # For algebraic equations 
 from time import time                                                                                       # Used to time the epoch/training duration
 from copy import  deepcopy                                                                                  # Used to create a new copy in memory
-from detectron2.utils import comm                                                                           # Something with GPU processing
-from detectron2.utils.logger import setup_logger                                                            # Setup the logger that will perform logging of events
 from custom_goto_trainer_class import My_GoTo_Trainer                                                       # To instantiate the Trainer class
 from visualize_image_batch import putModelWeights                                                           # Assign the latest model checkpoint to the config model.weights 
 from custom_setup_func import SaveHistory, printAndLog                                                      # Save history_dict, log results
@@ -124,6 +122,7 @@ def objective_train_func(trial, FLAGS, cfg, logs, data_batches=None, hyperparame
     train_start_time = time()                                                                               # Now the training starts
     epoch_next_display = FLAGS.display_rate - 1                                                             # The next epoch where the images must be visualized
     img_ytrue_ypred = None                                                                                  # Initiate a variable for the predicted images 
+    history = deepcopy(FLAGS.history) 
 
     # Change the FLAGS and config parameters and perform either hyperparameter optimization, use the best found parameters or simply just train
     config, FLAGS = get_HPO_params(config=cfg, FLAGS=FLAGS, trial=trial, hpt_opt=hyperparameter_optimization)
@@ -149,6 +148,8 @@ def objective_train_func(trial, FLAGS, cfg, logs, data_batches=None, hyperparame
                 metrics_eval=eval_val_results, history=history, pq_train=train_pq_results, pq_val=val_pq_results)    # ... including all training and validation metrics
             SaveHistory(historyObject=history, save_folder=config.OUTPUT_DIR)                               # Save the history dictionary after each epoch
             [os.remove(os.path.join(config.OUTPUT_DIR, x)) for x in os.listdir(config.OUTPUT_DIR) if "events.out.tfevent" in x]
+            if not hyperparameter_optimization:
+                FLAGS.history = deepcopy(history) 
             
             # Performing callbacks
             if FLAGS.inference_only==False and hyperparameter_optimization==False: 

@@ -84,6 +84,7 @@ def changeFLAGS(FLAGS):
     FLAGS.quit_training = False                                             # The initial value for the "quit_training" parameter should be False
     FLAGS.ignore_label = 0 if FLAGS.ignore_background else 255              # As default no labels will be ignored 
     FLAGS.batch_size = int(FLAGS.batch_size) 
+    FLAGS.history = None 
     return FLAGS
 
 # Define a function to extract the final results that will be printed in the log file
@@ -134,7 +135,7 @@ parser.add_argument("--num_random_trials", type=int, default=10, help="The numbe
 parser.add_argument("--display_rate", type=int, default=5, help="The epoch_rate of how often to display image segmentations. A display_rate of 3 means that every third epoch, visual segmentations are saved. Default: 5")
 parser.add_argument("--gpus_used", type=int, default=1, help="The number of GPU's to use for training. Only applicable for training with ADE20K. This input argument deprecates the '--num-gpus' argument. Default: 1")
 parser.add_argument("--num_epochs", type=int, default=250, help="The number of epochs to train the model for. Default: 1")
-parser.add_argument("--start_epoch", type=int, default=0, help="The epoch number to start training from. Primarily used when training should be continued after e.g. a failure. Default: 0")
+parser.add_argument("--start_epoch", type=int, default=5, help="The epoch number to start training from. Primarily used when training should be continued after e.g. a failure. Default: 0")
 parser.add_argument("--warm_up_epochs", type=int, default=8, help="The number of epochs to warm up the learning rate when training. Will go from 1/100 '--learning_rate' to '--learning_rate' during these warm_up_epochs. Default: 3")
 parser.add_argument("--patience", type=int, default=5, help="The number of epochs to accept that the model hasn't improved before lowering the learning rate by a factor '--lr_gamma'. Default: 5")
 parser.add_argument("--early_stop_patience", type=int, default=13, help="The number of epochs to accept that the model hasn't improved before terminating training. Default: 12")
@@ -150,13 +151,14 @@ parser.add_argument("--weight_decay", type=float, default=1e-4, help="The weight
 parser.add_argument("--min_delta", type=float, default=5e-4, help="The minimum improvement the model must have made in order to be accepted as an actual improvement. Default 5e-4")
 parser.add_argument("--ignore_background", type=str2bool, default=False, help="Whether or not we are ignoring the background class. True = Ignore background, False = reward/penalize for background predictions. Default: False")
 parser.add_argument("--model_weights_used", type=str, default="False", help="Path to model weights from earlier training to continue from. Default: 'False'")
+parser.add_argument("--history_dict_used", type=str, default="False", help="Path to history pickle dictionary from earlier training to continue from. Default: 'False'")
 parser.add_argument("--crop_enabled", type=str2bool, default=False, help="Whether or not cropping is allowed on the images. Default: True")
 parser.add_argument("--hp_optim", type=str2bool, default=True, help="Whether or not we are initiating the training with a hyperparameter optimization. Default: True")
 parser.add_argument("--inference_only", type=str2bool, default=False, help="Whether or not training is skipped and only inference is run. This input argument deprecates the '--eval_only' argument. Default: False")
 parser.add_argument("--display_images", type=str2bool, default=False, help="Whether or not some random sample images are displayed before training starts. Default: False")
 parser.add_argument("--use_checkpoint", type=str2bool, default=False, help="Whether or not we are loading weights from a model checkpoint file before training. Default: False")
-parser.add_argument("--use_transformer_backbone", type=str2bool, default=True, help="Whether or not we are using the extended swin_small_transformer backbone. Only applicable if '--use_per_pixel_baseline'=False. Default: True")
-parser.add_argument("--use_per_pixel_baseline", type=str2bool, default=False, help="Whether or not we are using the per_pixel_calculating head. Alternative is the MaskFormer (or transformer) heads. Default: False")
+parser.add_argument("--use_transformer_backbone", type=str2bool, default=False, help="Whether or not we are using the extended swin_small_transformer backbone. Only applicable if '--use_per_pixel_baseline'=False. Default: True")
+parser.add_argument("--use_per_pixel_baseline", type=str2bool, default=True, help="Whether or not we are using the per_pixel_calculating head. Alternative is the MaskFormer (or transformer) heads. Default: False")
 parser.add_argument("--debugging", type=str2bool, default=False, help="Whether or not we are debugging the script. Default: False")
 # Parse the arguments into a Namespace variable
 FLAGS = parser.parse_args()
@@ -174,7 +176,7 @@ else:                                                                       # Ot
 # Lowering the number of trials and epochs if working on my local computer 
 if any([x in MaskFormer_dir.lower() for x in ["nico", "wd974261"]]):
     FLAGS.num_trials = 2
-    FLAGS.num_epochs = 2
+    FLAGS.num_epochs = 7
     FLAGS.hp_optim = True  
 
 # Create the initial configuration, define FLAGS epoch variables and alter the configuration
@@ -187,6 +189,18 @@ FLAGS.num_classes = len(MetadataCatalog[cfg.DATASETS.TRAIN[0]].stuff_classes)   
 FLAGS.available_mem_info = available_mem_info.tolist()                      # Save the information of available GPU memory in the FLAGS variable
 FLAGS.PN_mean_pixel_area = 1363
 cfg = changeConfig_withFLAGS(cfg=cfg, FLAGS=FLAGS)                          # Set the final values for the config
+
+if not "false" in FLAGS.history_dict_used.lower():
+    import time 
+    time.sleep(10)
+    assert os.path.isfile(FLAGS.history_dict_used), "The history doesn't exist on the given path {}".format(FLAGS.history_dict_used)
+    with open(FLAGS.history_dict_used.lower(), "rb") as hist_file:
+        while True:
+            try:
+                FLAGS.history = deepcopy(pickle.load(hist_file))
+            except EOFError as ex:
+                break 
+        
 
 # Create the log file
 log_file = os.path.join(cfg.OUTPUT_DIR, "Training_logs.txt")                # Initiate the log filename
