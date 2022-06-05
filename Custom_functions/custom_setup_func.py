@@ -195,6 +195,7 @@ if any([x in MaskFormer_dir.lower() for x in ["nico", "wd974261"]]):
     FLAGS.num_epochs = 7
     FLAGS.hp_optim = True  
 
+# Read the earlier history, if any is given 
 if not "false" in FLAGS.history_dict_used.lower():
     assert os.path.isfile(FLAGS.history_dict_used), "The history doesn't exist on the given path {}".format(FLAGS.history_dict_used)
     with open(FLAGS.history_dict_used.lower(), "rb") as hist_file:
@@ -203,7 +204,10 @@ if not "false" in FLAGS.history_dict_used.lower():
                 FLAGS.history = deepcopy(pickle.load(hist_file))
             except EOFError as ex:
                 break 
-        
+        if FLAGS.history is not None:
+            for key, value in FLAGS.history.items():
+                FLAGS.history[key] = FLAGS.history[key][:FLAGS.start_epoch]
+
 
 # Create the log file
 log_file = os.path.join(cfg.OUTPUT_DIR, "Training_logs.txt")                # Initiate the log filename
