@@ -85,6 +85,10 @@ def changeFLAGS(FLAGS):
     FLAGS.ignore_label = 0 if FLAGS.ignore_background else 255              # As default no labels will be ignored 
     FLAGS.batch_size = int(FLAGS.batch_size) 
     FLAGS.history = None 
+    if "false" not in FLAGS.best_params_used.lower():
+        assert os.path.isfile(FLAGS.best_params_used), "The given path for the best parameters {} is not an existing file".format(FLAGS.best_params_used)
+        with open(FLAGS.best_params_used, "rb") as fp:
+            FLAGS.best_params = pickle.load(fp) 
     return FLAGS
 
 # Define a function to extract the final results that will be printed in the log file
@@ -152,6 +156,7 @@ parser.add_argument("--min_delta", type=float, default=5e-4, help="The minimum i
 parser.add_argument("--ignore_background", type=str2bool, default=False, help="Whether or not we are ignoring the background class. True = Ignore background, False = reward/penalize for background predictions. Default: False")
 parser.add_argument("--model_weights_used", type=str, default="False", help="Path to model weights from earlier training to continue from. Default: 'False'")
 parser.add_argument("--history_dict_used", type=str, default="False", help="Path to history pickle dictionary from earlier training to continue from. Default: 'False'")
+parser.add_argument("--best_params_used", type=str, default="False", help="Path to dictionary containing the best parameters found after a HPO search. Default: 'False'")
 parser.add_argument("--crop_enabled", type=str2bool, default=False, help="Whether or not cropping is allowed on the images. Default: True")
 parser.add_argument("--hp_optim", type=str2bool, default=True, help="Whether or not we are initiating the training with a hyperparameter optimization. Default: True")
 parser.add_argument("--inference_only", type=str2bool, default=False, help="Whether or not training is skipped and only inference is run. This input argument deprecates the '--eval_only' argument. Default: False")
@@ -190,9 +195,9 @@ FLAGS.available_mem_info = available_mem_info.tolist()                      # Sa
 FLAGS.PN_mean_pixel_area = 1363
 cfg = changeConfig_withFLAGS(cfg=cfg, FLAGS=FLAGS)                          # Set the final values for the config
 
+
 if not "false" in FLAGS.history_dict_used.lower():
     import time 
-    time.sleep(10)
     assert os.path.isfile(FLAGS.history_dict_used), "The history doesn't exist on the given path {}".format(FLAGS.history_dict_used)
     with open(FLAGS.history_dict_used.lower(), "rb") as hist_file:
         while True:
