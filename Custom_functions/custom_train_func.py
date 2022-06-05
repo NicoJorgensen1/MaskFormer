@@ -107,7 +107,7 @@ def objective_train_func(trial, FLAGS, cfg, logs, data_batches=None, hyperparame
     if FLAGS.inference_only: objective_mode = "inference"
     if hyperparameter_optimization: objective_mode = "hyperparameter optimization trial {:d}/{:d}".format(FLAGS.HPO_current_trial+1, FLAGS.num_trials)
     printAndLog(input_to_write="Start {:s}...".format(objective_mode).upper(), logs=logs, postfix="\n")     # Print and log a message saying that a new iteration is now starting
-    train_loader, val_loader, train_evaluator, val_evaluator, history = None, None, None, None, None        # Initiates all the loaders, evaluators and history as None type objects
+    train_loader, val_loader, train_evaluator, val_evaluator = None, None, None, None                       # Initiates all the loaders, evaluators and history as None type objects
     train_mode = "min" if "loss" in FLAGS.eval_metric else "max"                                            # Compute the mode of which the performance should be measured. Either a negative or a positive value is better
     new_best = np.inf if train_mode=="min" else -np.inf                                                     # Initiate the original "best_value" as either infinity or -infinity according to train_mode
     best_epoch = 0                                                                                          # Initiate the best epoch as being epoch_0, i.e. before doing any model training
@@ -148,8 +148,6 @@ def objective_train_func(trial, FLAGS, cfg, logs, data_batches=None, hyperparame
                 metrics_eval=eval_val_results, history=history, pq_train=train_pq_results, pq_val=val_pq_results)    # ... including all training and validation metrics
             SaveHistory(historyObject=history, save_folder=config.OUTPUT_DIR)                               # Save the history dictionary after each epoch
             [os.remove(os.path.join(config.OUTPUT_DIR, x)) for x in os.listdir(config.OUTPUT_DIR) if "events.out.tfevent" in x]
-            if not hyperparameter_optimization:
-                FLAGS.history = deepcopy(history) 
             
             # Performing callbacks
             if FLAGS.inference_only==False and hyperparameter_optimization==False: 

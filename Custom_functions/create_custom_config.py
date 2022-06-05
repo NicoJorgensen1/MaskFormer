@@ -52,6 +52,8 @@ def createVitrolifeConfiguration(FLAGS):
         cfg.DATASETS.TEST = ("vitrolife_dataset_val",)                                      # ... define the validation dataset by using the config as a CfgNode 
     if "false" not in FLAGS.model_weights_used.lower():
         cfg.MODEL.WEIGHTS = FLAGS.model_weights_used 
+    cfg.OUTPUT_DIR = os.path.join(MaskFormer_dir, "output_{:s}{:s}".format("vitrolife_" if "vitro" in FLAGS.dataset_name.lower() else "", FLAGS.output_dir_postfix))    # Get MaskFormer directory and name the output directory
+    os.makedirs(cfg.OUTPUT_DIR, exist_ok=True)                                              # Create the output folder, if it doesn't already exist
     return cfg
 
 
@@ -87,8 +89,6 @@ def changeConfig_withFLAGS(cfg, FLAGS):
     cfg.SOLVER.CHECKPOINT_PERIOD = int(cfg.SOLVER.MAX_ITER*1e5)                             # Save a new model checkpoint after each epoch, i.e. after everytime the entire trainining set has been seen by the model
     cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST = 0.05                                            # Assign the IoU threshold used for the model
     cfg.INPUT.FORMAT = "BGR"                                                                # The input format is set to be BGR, like the visualization method
-    cfg.OUTPUT_DIR = os.path.join(MaskFormer_dir, "output_{:s}{:s}".format("vitrolife_" if "vitro" in FLAGS.dataset_name.lower() else "", FLAGS.output_dir_postfix))    # Get MaskFormer directory and name the output directory
-    os.makedirs(cfg.OUTPUT_DIR, exist_ok=True)                                              # Create the output folder, if it doesn't already exist
     if "vitrolife" in FLAGS.dataset_name.lower():                                           # If the vitrolife dataset was chosen ...
         cfg.MODEL.SEM_SEG_HEAD.NUM_CLASSES = len(MetadataCatalog[cfg.DATASETS.TEST[0]].stuff_classes)   # Assign the number of classes for the model to segment
         cfg.MODEL.SEM_SEG_HEAD.IGNORE_VALUE = FLAGS.ignore_label                            # If we are training on the Vitrolife dataset, HPO will be able to enable/disable whether or not background should be displayed...

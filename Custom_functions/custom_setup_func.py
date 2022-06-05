@@ -170,13 +170,24 @@ FLAGS = parser.parse_args()
 FLAGS = changeFLAGS(FLAGS)
 
 
-# Setup functions
+# Create the initial configuration, define FLAGS epoch variables and alter the configuration
 too_few_gpus_str, gpus_used_string, available_mem_info = assign_free_gpus(max_gpus=FLAGS.num_gpus)  # Assigning the running script to the selected amount of GPU's with the largest memory available
+cfg = createVitrolifeConfiguration(FLAGS=FLAGS)                             # Create the custom configuration used to e.g. build the model
+
+# Setup functions
 if "vitrolife" in FLAGS.dataset_name.lower():                               # If we want to work with the Vitrolife dataset ...
     register_vitrolife_data_and_metadata_func(debugging=FLAGS.debugging)    # ... register the vitrolife dataset
 else:                                                                       # Otherwise, if we are working on the ade20k dataset ...
     for split in ["train", "val"]:                                          # ... then we will find the training and the validation set
         MetadataCatalog["ade20k_sem_seg_{:s}".format(split)].num_files_in_dataset = len(DatasetCatalog["ade20k_sem_seg_{:s}".format(split)]())  # ... and create a key-value pair telling the number of files in the dataset
+FLAGS.num_train_files = MetadataCatalog[cfg.DATASETS.TRAIN[0]].num_files_in_dataset # Write the number of training files to the FLAGS namespace
+FLAGS.num_val_files = MetadataCatalog[cfg.DATASETS.TEST[0]].num_files_in_dataset    # Write the number of validation files to the FLAGS namespace
+FLAGS.batch_size = np.min([FLAGS.batch_size, FLAGS.num_train_files])        # The batch size can't be greater than the number of files in the dataset
+FLAGS.epoch_iter = int(np.floor(np.divide(FLAGS.num_train_files, FLAGS.batch_size)))# Compute the number of iterations per training epoch
+FLAGS.num_classes = len(MetadataCatalog[cfg.DATASETS.TRAIN[0]].stuff_classes)   # Get the number of classes in the current dataset
+FLAGS.available_mem_info = available_mem_info.tolist()                      # Save the information of available GPU memory in the FLAGS variable
+FLAGS.PN_mean_pixel_area = 1363
+cfg = changeConfig_withFLAGS(cfg=cfg, FLAGS=FLAGS)                          # Set the final values for the config after registering the Vitrolife dataset 
 
 # Lowering the number of trials and epochs if working on my local computer 
 if any([x in MaskFormer_dir.lower() for x in ["nico", "wd974261"]]):
@@ -184,20 +195,7 @@ if any([x in MaskFormer_dir.lower() for x in ["nico", "wd974261"]]):
     FLAGS.num_epochs = 7
     FLAGS.hp_optim = True  
 
-# Create the initial configuration, define FLAGS epoch variables and alter the configuration
-cfg = createVitrolifeConfiguration(FLAGS=FLAGS)                             # Create the custom configuration used to e.g. build the model
-FLAGS.num_train_files = MetadataCatalog[cfg.DATASETS.TRAIN[0]].num_files_in_dataset# Write the number of training files to the FLAGS namespace
-FLAGS.num_val_files = MetadataCatalog[cfg.DATASETS.TEST[0]].num_files_in_dataset    # Write the number of validation files to the FLAGS namespace
-FLAGS.batch_size = np.min([FLAGS.batch_size, FLAGS.num_train_files])        # The batch size can't be greater than the number of files in the dataset
-FLAGS.epoch_iter = int(np.floor(np.divide(FLAGS.num_train_files, FLAGS.batch_size)))# Compute the number of iterations per training epoch
-FLAGS.num_classes = len(MetadataCatalog[cfg.DATASETS.TRAIN[0]].stuff_classes)   # Get the number of classes in the current dataset
-FLAGS.available_mem_info = available_mem_info.tolist()                      # Save the information of available GPU memory in the FLAGS variable
-FLAGS.PN_mean_pixel_area = 1363
-cfg = changeConfig_withFLAGS(cfg=cfg, FLAGS=FLAGS)                          # Set the final values for the config
-
-
 if not "false" in FLAGS.history_dict_used.lower():
-    import time 
     assert os.path.isfile(FLAGS.history_dict_used), "The history doesn't exist on the given path {}".format(FLAGS.history_dict_used)
     with open(FLAGS.history_dict_used.lower(), "rb") as hist_file:
         while True:
