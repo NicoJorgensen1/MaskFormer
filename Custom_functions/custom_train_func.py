@@ -81,20 +81,20 @@ def get_HPO_params(config, FLAGS, trial, hpt_opt=False):
         config = changeConfig_withFLAGS(cfg=config, FLAGS=FLAGS)
     elif all([hpt_opt==False, trial is not None, FLAGS.hp_optim==True]):
         # Let the FLAGS parameters take the values of the best found parameters 
-        FLAGS.learning_rate = trial.params["learning_rate"]
-        FLAGS.batch_size = trial.params["batch_size"]
-        FLAGS.optimizer_used = trial.params["optimizer_used"]
-        FLAGS.weight_decay = trial.params["weight_decay"]
-        FLAGS.backbone_multiplier = trial.params["backbone_multiplier"] 
-        FLAGS.dice_loss_weight = trial.params["dice_loss_weight"]
-        FLAGS.mask_loss_weight = trial.params["mask_loss_weight"]
-        FLAGS.dropout = trial.params["dropout"]
-        if "vitrolife" in FLAGS.dataset_name:
-            FLAGS.num_queries = trial.params["num_queries"]
-            FLAGS.use_checkpoint = bool(trial.params["use_checkpoint"])
+        FLAGS.learning_rate = FLAGS.best_params["learning_rate"]
+        FLAGS.batch_size = FLAGS.best_params["batch_size"]
+        FLAGS.optimizer_used = FLAGS.best_params["optimizer_used"]
+        FLAGS.weight_decay = FLAGS.best_params["weight_decay"]
+        FLAGS.backbone_multiplier = FLAGS.best_params["backbone_multiplier"] 
+        FLAGS.dice_loss_weight = FLAGS.best_params["dice_loss_weight"]
+        FLAGS.mask_loss_weight = FLAGS.best_params["mask_loss_weight"]
+        FLAGS.dropout = FLAGS.best_params["dropout"]
+        if "vitrolife" in FLAGS.dataset_name.lower():
+            FLAGS.num_queries = FLAGS.best_params["num_queries"]
+            FLAGS.use_checkpoint = bool(FLAGS.best_params["use_checkpoint"])
         if FLAGS.use_transformer_backbone==False:
-            FLAGS.resnet_depth = trial.params["resnet_depth"]
-            FLAGS.backbone_freeze_layers = trial.params["backbone_freeze"]
+            FLAGS.resnet_depth = FLAGS.best_params["resnet_depth"]
+            FLAGS.backbone_freeze_layers = FLAGS.best_params["backbone_freeze"]
         del config 
         config = createVitrolifeConfiguration(FLAGS=FLAGS)
         config = changeConfig_withFLAGS(cfg=config, FLAGS=FLAGS)

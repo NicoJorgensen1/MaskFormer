@@ -88,6 +88,7 @@ def perform_HPO():                                                              
                         catch=(MemoryError,), gc_after_trial=True)
         trial = study.best_trial 
         best_params = trial.params 
+        FLAGS.best_params = deepcopy(best_params)
         SaveHistory(historyObject=best_params, save_folder=cfg.OUTPUT_DIR, historyName="best_HPO_params")
         printAndLog(input_to_write="Hyperparameter optimization completed.\nBest {:s}: {:.3f}".format(FLAGS.eval_metric, trial.value), logs=log_file, prefix="\n")
         printAndLog(input_to_write="Best hyperparameters: ".ljust(25), logs=log_file)
@@ -99,6 +100,7 @@ def perform_HPO():                                                              
         for hpo_trial in study.trials:
             if hpo_trial.values is None: continue
             if np.isnan(hpo_trial.values[-1]): continue
+            if np.isinf(hpo_trial.values[-1]): continue
             trials_list.append(hpo_trial)
             eval_metric_list.append(hpo_trial.values[-1])
         vals_to_keep = np.unique(np.argsort(eval_metric_list)[:5].tolist() + np.argsort(eval_metric_list)[-5:].tolist())
