@@ -74,3 +74,57 @@ SaveHistory(historyObject=test_history, save_folder=cfg.OUTPUT_DIR, historyName=
 [os.remove(os.path.join(cfg.OUTPUT_DIR, x)) for x in os.listdir(cfg.OUTPUT_DIR) if "metrics" in x.lower() and x.endswith(".json")]
 
 zip_output(cfg)
+
+
+
+
+
+# from detectron2.modeling import build_model
+# from copy import deepcopy 
+# from detectron2.structures import ImageList
+# from detectron2.data import DatasetCatalog, MetadataCatalog, DatasetMapper, build_detection_train_loader
+
+# from create_custom_config import createVitrolifeConfiguration, changeConfig_withFLAGS
+# from custom_goto_trainer_class import custom_augmentation_mapper
+
+
+# FLAGS.use_transformer_backbone = True    
+# FLAGS.use_per_pixel_baseline = True 
+# FLAGS.resnet_depth = 101
+# FLAGS.use_checkpoint = False
+# FLAGS.num_queries = 80
+
+# del config, dataloader, model_test, features, outputs 
+
+# config = createVitrolifeConfiguration(FLAGS)
+# config_folder = os.path.join(MaskFormer_dir, "configs", "ade20k-150")
+# if FLAGS.use_per_pixel_baseline:
+#     config.merge_from_file(os.path.join(config_folder, "per_pixel_baseline_R"+"{:d}".format(50)+"_bs16_160k.yaml"))    # ... only R50 per-pixel baseline config is available 
+# if FLAGS.use_transformer_backbone:
+#     swin_type = "base" 
+#     swin_config = [x for x in os.listdir(os.path.join(config_folder, "swin")) if all([swin_type in x, x.endswith(".yaml")])][-1] 
+#     config.merge_from_file(os.path.join(config_folder, "swin", swin_config))             # ... merge with the config for the chosen swin transformer
+# config = changeConfig_withFLAGS(cfg=config, FLAGS=FLAGS)
+# if FLAGS.use_transformer_backbone:
+#     config.MODEL.DEVICE = "cpu"
+
+# model_test = build_model(cfg=config)
+# dataloader = iter(build_detection_train_loader(DatasetCatalog.get(config.DATASETS.TRAIN[0]),                    # ... create the dataloader for evaluation ...
+#     mapper=custom_augmentation_mapper(config, is_train=True), total_batch_size=1, num_workers=2))          # ... with batch_size = 1 and no augmentation on the mapper
+
+# batched_inputs = next(dataloader) 
+
+# images = [x["image"].to(model_test.device) for x in batched_inputs]
+# images = [(x - model_test.pixel_mean) / model_test.pixel_std for x in images]
+# images = ImageList.from_tensors(images, model_test.size_divisibility)
+
+# features = model_test.backbone(images.tensor)
+# outputs = model_test.sem_seg_head(features)
+
+# pred_logits = outputs["pred_logits"]
+# pred_masks = outputs["pred_masks"]
+
+# model_test.backbone
+# print("\nInput img.shape: {}. res4.shape: {}. res5.shape: {}.\npred_logits.shape: {}, pred_masks.shape: {}\n".format(batched_inputs[0]["image"].numpy().shape, features["res4"].detach().cpu().numpy().shape, features["res5"].detach().cpu().numpy().shape, pred_logits.shape, pred_masks.shape))
+
+

@@ -46,10 +46,12 @@ def createVitrolifeConfiguration(FLAGS):
         cfg.merge_from_file(os.path.join(config_folder, "per_pixel_baseline_R"+"{:d}".format(50)+"_bs16_160k.yaml"))    # ... only R50 per-pixel baseline config is available 
         if FLAGS.use_checkpoint==True:                                                      # If the user choose to start training from a earlier checkpoint ...
             cfg.MODEL.WEIGHTS = os.path.join(checkpoint_dir, "maskformer_per_pixel_baseline_checkpoint.pkl")    # Load the per_pixel classification checkpoint
-    cfg.merge_from_file(os.path.join(config_folder, "Base-ADE20K-150.yaml"))                # Merge with the base config for ade20K dataset. This is the config selecting that we use the ADE20K dataset
+    # cfg.merge_from_file(os.path.join(config_folder, "Base-ADE20K-150.yaml"))                # Merge with the base config for ade20K dataset. This is the config selecting that we use the ADE20K dataset
     if "vitrolife" in FLAGS.dataset_name.lower():                                           # If the vitrolife dataset was chosen ...
         cfg["DATASETS"]["TRAIN"] = ("vitrolife_dataset_train",)                             # ... define the training dataset by using the config as a dictionary
         cfg.DATASETS.TEST = ("vitrolife_dataset_val",)                                      # ... define the validation dataset by using the config as a CfgNode 
+    if "false" not in FLAGS.model_weights_used.lower():
+        cfg.MODEL.WEIGHTS = FLAGS.model_weights_used 
     return cfg
 
 

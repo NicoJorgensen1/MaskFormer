@@ -129,7 +129,7 @@ def objective_train_func(trial, FLAGS, cfg, logs, data_batches=None, hyperparame
     config, FLAGS = get_HPO_params(config=cfg, FLAGS=FLAGS, trial=trial, hpt_opt=hyperparameter_optimization)
     
     # Train the model 
-    for epoch in range(epochs_to_run):                                                                      # Iterate over the chosen amount of epochs
+    for epoch in range(FLAGS.start_epoch, epochs_to_run):                                                   # Iterate over the chosen amount of epochs
         try:
             epoch_start_time = time()                                                                       # Now this new epoch starts
             if FLAGS.inference_only==False:

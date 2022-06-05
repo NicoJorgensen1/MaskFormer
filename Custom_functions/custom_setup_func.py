@@ -134,6 +134,7 @@ parser.add_argument("--num_random_trials", type=int, default=10, help="The numbe
 parser.add_argument("--display_rate", type=int, default=5, help="The epoch_rate of how often to display image segmentations. A display_rate of 3 means that every third epoch, visual segmentations are saved. Default: 5")
 parser.add_argument("--gpus_used", type=int, default=1, help="The number of GPU's to use for training. Only applicable for training with ADE20K. This input argument deprecates the '--num-gpus' argument. Default: 1")
 parser.add_argument("--num_epochs", type=int, default=250, help="The number of epochs to train the model for. Default: 1")
+parser.add_argument("--start_epoch", type=int, default=0, help="The epoch number to start training from. Primarily used when training should be continued after e.g. a failure. Default: 0")
 parser.add_argument("--warm_up_epochs", type=int, default=8, help="The number of epochs to warm up the learning rate when training. Will go from 1/100 '--learning_rate' to '--learning_rate' during these warm_up_epochs. Default: 3")
 parser.add_argument("--patience", type=int, default=5, help="The number of epochs to accept that the model hasn't improved before lowering the learning rate by a factor '--lr_gamma'. Default: 5")
 parser.add_argument("--early_stop_patience", type=int, default=13, help="The number of epochs to accept that the model hasn't improved before terminating training. Default: 12")
@@ -148,6 +149,7 @@ parser.add_argument("--dropout", type=float, default=0.05, help="The dropout rat
 parser.add_argument("--weight_decay", type=float, default=1e-4, help="The weight decay used for the model. Default: 1e-4")
 parser.add_argument("--min_delta", type=float, default=5e-4, help="The minimum improvement the model must have made in order to be accepted as an actual improvement. Default 5e-4")
 parser.add_argument("--ignore_background", type=str2bool, default=False, help="Whether or not we are ignoring the background class. True = Ignore background, False = reward/penalize for background predictions. Default: False")
+parser.add_argument("--model_weights_used", type=str, default="False", help="Path to model weights from earlier training to continue from. Default: 'False'")
 parser.add_argument("--crop_enabled", type=str2bool, default=False, help="Whether or not cropping is allowed on the images. Default: True")
 parser.add_argument("--hp_optim", type=str2bool, default=True, help="Whether or not we are initiating the training with a hyperparameter optimization. Default: True")
 parser.add_argument("--inference_only", type=str2bool, default=False, help="Whether or not training is skipped and only inference is run. This input argument deprecates the '--eval_only' argument. Default: False")
@@ -199,5 +201,6 @@ printAndLog(input_to_write=gpus_used_string, logs=log_file, postfix="\n")
 
 
 # Return the values again
-def setup_func(): return FLAGS, cfg, log_file
+def setup_func():
+    return FLAGS, cfg, log_file
 
