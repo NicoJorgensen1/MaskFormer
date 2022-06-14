@@ -39,19 +39,22 @@ printAndLog(input_to_write={key: vars(FLAGS)[key] for key in sorted(vars(FLAGS).
             logs=log_file, oneline=False, length=27)                                                # ... sorted by the key names 
 
 # Analyze the model with the found parameters from the HPO
-model_analysis, FLAGS = analyze_model_func(config=cfg, args=FLAGS)                                  # Analyze the model with the FLAGS input parameters
-printAndLog(input_to_write="Model analysis:".upper(), logs=log_file)                                # Print the model analysis ...
-printAndLog(input_to_write=model_analysis, logs=log_file, oneline=False, length=27)                 # ... and write it to the logfile
+data_batches = None 
+if not FLAGS.inference_only:
+    model_analysis, FLAGS = analyze_model_func(config=cfg, args=FLAGS)                              # Analyze the model with the FLAGS input parameters
+    printAndLog(input_to_write="Model analysis:".upper(), logs=log_file)                            # Print the model analysis ...
+    printAndLog(input_to_write=model_analysis, logs=log_file, oneline=False, length=27)             # ... and write it to the logfile
 
-# Visualize some random images before training 
-fig_list_before, data_batches, cfg, FLAGS, _ = visualize_the_images(config=cfg, FLAGS=FLAGS)        # Visualize some segmentations on random images before training
+    # Visualize some random images before training 
+    fig_list_before, data_batches, cfg, FLAGS, _ = visualize_the_images(config=cfg, FLAGS=FLAGS)    # Visualize some segmentations on random images before training
 
 # Train the model with the best found hyperparameters
 history, test_history, new_best, best_epoch, cfg, PN_pred, PN_true = objective_train_func(trial=trial,  # Start the training with ...
     FLAGS=FLAGS, cfg=cfg, logs=log_file, data_batches=data_batches, hyperparameter_optimization=False)  # ... the optimal hyper parameters
 
 # Visualize the same images, now after training
-cfg = keepAllButLatestAndBestModel(cfg=cfg, history=history, FLAGS=FLAGS, bestOrLatest="best")      # Put the model weights for the best performing model on the config
+if not FLAGS.inference_only:
+    cfg = keepAllButLatestAndBestModel(cfg=cfg, history=history, FLAGS=FLAGS, bestOrLatest="best")  # Put the model weights for the best performing model on the config
 write_config_to_file(config=cfg)                                                                    # Save the config file with the final parameters used in the output dir
 visualize_the_images(config=cfg,FLAGS=FLAGS, data_batches=data_batches, model_done_training=True)   # Visualize the images again
 

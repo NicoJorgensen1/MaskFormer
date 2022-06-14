@@ -16,6 +16,12 @@ def normalizeConfMatrix(conf_matrix):
     return conf_matrix_normal                                                                       # Return the normalized confusion matrix
 
 
+# conf_train = np.asarray([93,2,0,0,0,0,0,2,100,2,0,0,0,0,0,3,24,1,0,0,0,0,0,1,8,1,0,0,0,0,0,1,30,0,0,0,0,0,0,0,2,0,0,0,0,0,0,0,0]).reshape(7,7)
+# conf_val = np.asarray([93, 2,0,0,0,0,0,2,100,2,0,0,0,0,1,3,23,1,0,0,0,0,0,1,8,1,0,0,0,1,0,1,30,0,0,0,0,0,0,0,2,0,0,0,0,0,0,0,0]).reshape(7,7)
+# conf_test = np.asarray([95,2,0,0,0,0,0,2,100,2,0,0,0,0,0,3,24,1,1,0,0,0,0,1,8,1,0,0,0,0,1,1,30,1,0,0,0,0,0,0,2,0,0,0,0,0,0,0,0]).reshape(7,7)
+
+
+
 # Function to plot confusion matrixes
 def plot_confusion_matrix(config, epoch=0, conf_train=None, conf_val=None, conf_test=None, done_training=False):
     conf_matrixes = {}                                                                              # Initiate the dictionary to store the confusion matrixes in
@@ -50,11 +56,11 @@ def plot_confusion_matrix(config, epoch=0, conf_train=None, conf_val=None, conf_
             ax.set(xticks=np.arange(0, len(labels)), yticks=np.arange(0, len(labels)),              # Set the tick parameters ...
                 xticklabels=labels, yticklabels=labels, xlabel="Predicted labels", ylabel="True labels")    # ... including tick labels
             ax.set_title("{:s}".format(split+tit_ext+" confusion matrix"), fontdict_title)          # Set the title for the confusion matrix
-            ax.tick_params(axis='both', labelrotation = 45, width=1, pad=0, labelsize=10)           # https://matplotlib.org/3.1.1/api/_as_gen/matplotlib.axes.Axes.tick_params.html
+            ax.tick_params(axis='both', labelrotation = 45, width=1, pad=0, labelsize=15)           # https://matplotlib.org/3.1.1/api/_as_gen/matplotlib.axes.Axes.tick_params.html
             ax.grid(False)                                                                          # Remove the grid from the confusion matrix 
             axe = make_axes_locatable(ax)                                                           # Extracts the current axes
             cax = axe.append_axes('right', size='5%', pad=0.05)                                     # Padding with some extra space next to the axes
-            fig.colorbar(im, cax=cax, orientation='vertical')                                       # Creates the colorbar
+            cbar = fig.colorbar(im, cax=cax, orientation='vertical')                                # Creates the colorbar
             if np.unique(labels).shape[0] <= 10:                                                    # If there is less than ten classes in the dataset...
                 treshVal = np.max(conf_matrix)/2                                                    # Treshold value for the color on the text => given as half the of the maximum value in the confusion matrix
                 for row_cmatrix in range(conf_matrix.shape[0]):                                     # Loops over all rows in the matrix
@@ -62,7 +68,9 @@ def plot_confusion_matrix(config, epoch=0, conf_train=None, conf_val=None, conf_
                         ax.text(col, row_cmatrix, format(conf_matrix[row_cmatrix, col], fmt),       # A matrix is indexed [rows, cols], while the cartesian coordinate system is [x, y].
                         ha="center", va="center",                                                   # Horizontal and vertical alignment of the text + center and fontsize
                         color="black" if conf_matrix[row_cmatrix, col] > treshVal else "white")     # If confMatrix[row, col] > treshVal the color is white, otherwise the text color is black
-    fig.tight_layout()                                                                              # Assure the figure will be put to a tight layout 
+            cbar.ax.tick_params(labelsize=18)  
+    # fig.tight_layout()                                                                              # Assure the figure will be put to a tight layout 
+    fig.show()
     fig_name_init = "Confusion matrixes "                                                           # Initialize the figure file name
     if done_training==False: fig_name = fig_name_init + "from epoch {:d}".format(epoch)             # If the model hasn't finished traning, the epoch number will be put in the figure name 
     if done_training==True: fig_name = fig_name_init + "from after training"                        # If the model has finished training, that will be put in the figure name 

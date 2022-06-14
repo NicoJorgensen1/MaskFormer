@@ -225,3 +225,5 @@ printAndLog(input_to_write=gpus_used_string, logs=log_file, postfix="\n")
 def setup_func():
     return FLAGS, cfg, log_file
 
+
+

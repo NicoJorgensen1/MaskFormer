@@ -50,6 +50,7 @@ def evaluateResults(FLAGS, cfg, data_split="train",  dataloader=None, evaluator=
             mapper=DatasetMapper(cfg, is_train=False, augmentations=[]), total_batch_size=1, num_workers=2))    # ... with batch_size = 1 and no augmentation on the mapper
     
     # Create the predictor and evaluator instances
+    cfg.MODEL.WEIGHTS = os.path.join(cfg.OUTPUT_DIR, "model_weights.pth") 
     predictor = DefaultPredictor(cfg=cfg)
     if evaluator is None: evaluator = My_Evaluator(dataset_name=dataset_name, output_dir=pred_out_dir)      # If no evaluator has been sent into the function, crate a new one
     evaluator.reset()                                                                                       # Reset the evaluator, i.e. remove all earlier computations and confusion matrixes

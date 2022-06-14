@@ -144,10 +144,11 @@ def objective_train_func(trial, FLAGS, cfg, logs, data_batches=None, hyperparame
                 val_pq_results = pq_evaluation(args=FLAGS, config=config, data_split="val")                 # Evaluate the Panoptic Quality for the validation semantic segmentation results
             
             # Prepare for the training phase of the next epoch. Switch back to training dataset, save history and learning curves and visualize segmentation results
-            history = show_history(config=config, FLAGS=FLAGS, metrics_train=eval_train_results,            # Create and save the learning curves ...
-                metrics_eval=eval_val_results, history=history, pq_train=train_pq_results, pq_val=val_pq_results)    # ... including all training and validation metrics
-            SaveHistory(historyObject=history, save_folder=config.OUTPUT_DIR)                               # Save the history dictionary after each epoch
-            [os.remove(os.path.join(config.OUTPUT_DIR, x)) for x in os.listdir(config.OUTPUT_DIR) if "events.out.tfevent" in x]
+            if any([all([FLAGS.inference_only, "ade20k" in FLAGS.dataset_name.lower()], all([FLAGS.inference_only==False, "vitrolife" in FLAGS.dataset_name.lower()]))]):
+                history = show_history(config=config, FLAGS=FLAGS, metrics_train=eval_train_results,            # Create and save the learning curves ...
+                    metrics_eval=eval_val_results, history=history, pq_train=train_pq_results, pq_val=val_pq_results)    # ... including all training and validation metrics
+                SaveHistory(historyObject=history, save_folder=config.OUTPUT_DIR)                               # Save the history dictionary after each epoch
+                [os.remove(os.path.join(config.OUTPUT_DIR, x)) for x in os.listdir(config.OUTPUT_DIR) if "events.out.tfevent" in x]
             
             # Performing callbacks
             if FLAGS.inference_only==False and hyperparameter_optimization==False: 

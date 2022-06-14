@@ -31,7 +31,7 @@ def createVitrolifeConfiguration(FLAGS):
     add_deeplab_config(cfg)                                                                 # Add some deeplab (i.e. sem_seg) config values
     add_mask_former_config(cfg)                                                             # Add some default values used for semantic segmentation to the config and choose datasetmapper
     if FLAGS.use_transformer_backbone==True:                                                # If the user chose the transformer backbone ...
-        swin_type = "tiny" if any([x in MaskFormer_dir.lower() for x in ["nico", "wd974261"]]) else "base"  # If on home computer, use swin tiny. If on gpucluster, use swin base
+        swin_type = "tiny" if any([x in MaskFormer_dir.lower() for x in ["nico", "wd974261"]]) and not FLAGS.inference_only else "base" # If on home computer, use swin tiny. If on gpucluster, use swin base
         swin_config = [x for x in os.listdir(os.path.join(config_folder, "swin")) if all([swin_type in x, x.endswith(".yaml")])][-1]    # Find the corresponding swin config
         cfg.merge_from_file(os.path.join(config_folder, "swin", swin_config))               # ... merge with the config for the chosen swin transformer
         if FLAGS.use_checkpoint==True:                                                      # If the user choose to start training from a earlier checkpoint ...
@@ -74,7 +74,7 @@ def changeConfig_withFLAGS(cfg, FLAGS):
     cfg.DATALOADER.NUM_WORKERS = FLAGS.num_workers                                          # Set the number of workers to only 2
     cfg.DATALOADER.ASPECT_RATIO_GROUPING = False                                            # We'll simply shuffle the input data, we won't group them after aspect ratios, even though that would be more GPU efficient
     cfg.INPUT.CROP.ENABLED = FLAGS.crop_enabled                                             # We will not allow any cropping of the input images
-    cfg.MODEL.DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'                       # Assign the device on which the model should run
+    cfg.MODEL.DEVICE = 'cuda' if torch.cuda.is_available() and not FLAGS.inference_only else 'cpu'  # Assign the device on which the model should run
     cfg.MODEL.MASK_FORMER.DICE_WEIGHT = FLAGS.dice_loss_weight                              # Set the weight for the dice loss (original 2)
     cfg.MODEL.MASK_FORMER.MASK_WEIGHT = FLAGS.mask_loss_weight                              # Set the weight for the mask predictive loss (original 20)
     cfg.MODEL.MASK_FORMER.DROPOUT = FLAGS.dropout                                           # We'll set a dropout probability on 0.10 when training
